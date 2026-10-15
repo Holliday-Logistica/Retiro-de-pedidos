@@ -138,6 +138,8 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
     <div class="stat"><b id="s4">0</b><span>Celdas libres</span></div>
   </div>
 
+  <div class="card hide" id="ubicar"></div>
+
   <div class="card">
     <h2>🔎 Buscar o escanear</h2>
     <div class="searchbar">
@@ -184,6 +186,7 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
       <button class="chip on" id="e1" style="--c:#f59e0b" onclick="setEst('LISTO')">EN ESPERA</button>
       <button class="chip" id="e2" style="--c:#6b7280" onclick="setEst('RETIRADO')">RETIRADOS</button>
       <button class="chip" id="e3" style="--c:#1d3557" onclick="setEst('')">TODOS</button>
+      <button class="chip" id="e4" style="--c:#2563eb" onclick="setEst('POR_UBICAR')">POR UBICAR</button>
     </div>
     <div class="tw"><table><thead><tr><th>PEDIDO</th><th>CLIENTE</th><th>DESTINO</th><th>CELDA</th><th>ESTADO</th><th>INGRESO</th></tr></thead><tbody id="lista"></tbody></table></div>
     <div class="acts" style="margin-top:14px">
@@ -199,7 +202,7 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
     <div class="stats">
       <div class="stat"><b id="r1">0</b><span>Bolsas sin asignar</span></div>
       <div class="stat"><b id="r2">0</b><span>Anotados en espera</span></div>
-      <div class="stat"><b id="r3">0</b><span>Asignadas por retirar</span></div>
+      <div class="stat"><b id="r3">0</b><span>Asignadas en proceso</span></div>
       <div class="stat"><b id="r4">0</b><span>Retiradas este mes</span></div>
     </div>
     <div class="grid2">
@@ -218,7 +221,7 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
           <label>Fecha</label><input id="rf" type="date">
           <div class="err" id="rerr"></div>
           <button class="pri full" onclick="guardarRotura()">Registrar rotura</button>
-          <p class="small">Cada bolsa queda como una unidad. Después la asignás a la primera persona anotada y le avisás.</p>
+          <p class="small">Cada bolsa queda como una unidad. Después la asignás a la primera persona anotada. Cuando la facturen, cargás el N° de remito y pasa a PEDIDOS para ubicarla en una celda y avisar.</p>
         </div>
         <div class="card hide" id="rres"></div>
         <div class="card"><h2>➕ Anotar un pedido (a pedido de la persona)</h2><div id="stform"></div></div>
@@ -321,7 +324,8 @@ const base=()=>location.href.split('#')[0];
 const pkey=p=>'p'+String(p).replace(/[^A-Za-z0-9]/g,'_');
 const dest=k=>CONFIG.DESTINOS.find(d=>d.k===k)||CONFIG.DESTINOS[0];
 const tag=k=>`<span class="tag" style="background:${dest(k).c}">${esc(k)}</span>`;
-const estTag=p=>p.e==='LISTO'?'<span class="est">EN ESPERA</span>':'<span class="est r">RETIRADO</span>';
+const estTag=p=>p.e==='LISTO'?'<span class="est">EN ESPERA</span>':p.e==='POR_UBICAR'?'<span class="est b">POR UBICAR</span>':'<span class="est r">RETIRADO</span>';
+const prim=s=>{const w=String(s||'').trim().split(/\s+/)[0]||'';return w.charAt(0)+w.slice(1).toLowerCase()};
 
 /* ---- almacenamiento: Firebase (compartido) o localStorage (solo este equipo) ---- */
 const LSK='retiro_db_v1';
@@ -357,6 +361,7 @@ function buscar(q,list,min){
 
 /* ---- pantallas públicas ---- */
 function resCardPub(p){
+  if(p.e==='POR_UBICAR')return `<div class="card body"><span class="est b">EN PREPARACIÓN</span><h3 style="margin:10px 0 0">${esc(p.cl)}</h3><p class="small">Pedido N° ${esc(p.n)} · todavía no tiene celda asignada. Te avisamos cuando esté listo para retirar.</p></div>`;
   if(p.e!=='LISTO')return `<div class="card body"><span class="est r">YA RETIRADO</span><h3 style="margin:10px 0 0">${esc(p.cl)}</h3><p class="small">Pedido N° ${esc(p.n)} · retirado el ${p.f?fh(p.f):'—'}</p></div>`;
   return `<div class="card body"><div class="small">TU PEDIDO ESTÁ EN LA CELDA</div><div class="celda">${esc(p.c)}</div>
   <div>${tag(p.d)}</div>${p.d==='RETIRA'?'<p style="margin:10px 0 0"><b>Retiralo por el mostrador</b></p>':''}
@@ -383,7 +388,7 @@ function consultar(q){clearTimeout(ct);ct=setTimeout(async()=>{
     g.forEach((_,i)=>{if($('sg'+i))initFirma('sg'+i)})
   }catch(e){$('pr').innerHTML='<div class="card body">Sin conexión.</div>'}},300)}
 function grupoHTML(i,lista){
-  const nombre=lista[0][1].cl,act=lista.filter(([k,p])=>p.e==='LISTO').sort((a,b)=>a[1].t-b[1].t),ret=lista.length-act.length;
+  const nombre=lista[0][1].cl,act=lista.filter(([k,p])=>p.e==='LISTO').sort((a,b)=>a[1].t-b[1].t),ret=lista.filter(([k,p])=>p.e==='RETIRADO').length;
   if(!act.length)return `<div class="card body cg3"><h3 style="margin:0">${esc(nombre)}</h3><p>No tiene pedidos pendientes de retiro.</p><p class="small">${ret} pedido(s) ya retirado(s).</p></div>`;
   return `<div class="card cg3" id="g${i}"><h3 style="margin:0 0 4px">${esc(nombre)}</h3>
   <p class="small" style="margin:0 0 10px">${act.length} pedido(s) para retirar. Mirá en qué celda está cada uno:</p>
@@ -413,7 +418,7 @@ async function confirmar(i){
   try{
     const firma=$('sg'+i).toDataURL('image/png'),now=Date.now(),ok=[];
     for(const k of keys){const p=await dbGet('pedidos/'+k);
-      if(p&&p.e==='LISTO'){await dbSet('firmas/'+k,firma);await dbSet('pedidos/'+k,{...p,e:'RETIRADO',f:now,rb:nom,fi:1});ok.push(p)}}
+      if(p&&p.e==='LISTO'){await dbSet('firmas/'+k,firma);await dbSet('pedidos/'+k,{...p,e:'RETIRADO',f:now,rb:nom,fi:1});if(p.ro)await roturaRetirada(p.ro,now,nom);ok.push(p)}}
     $('g'+i).innerHTML=ok.length?`<div class="body" style="text-align:center"><span class="status ok" style="background:var(--ok);color:#fff;padding:4px 12px;border-radius:99px;font-weight:800">✔ RETIRO REGISTRADO</span>
       <h3>${esc(nom)}</h3>${ok.map(p=>`<div>Pedido N° ${esc(p.n)} · celda ${esc(p.c)}</div>`).join('')}<p class="small">${fh(now)}</p></div>`
       :'<div class="body" style="text-align:center"><p>Esos pedidos ya habían sido retirados.</p></div>'
@@ -445,7 +450,7 @@ function render(){
   if($('mcnt')) $('mcnt').textContent=`· ${n} ocupadas / ${CELDAS.length-n} libres`;
   const sel=selKey&&P[selKey]&&P[selKey].e==='LISTO'?P[selKey].c:selCell;
   if($('plano')) $('plano').innerHTML=planoHTML(occ,sel,false);
-  chips();celdaSel();lista();detalle();
+  chips();celdaSel();lista();ubicarCard();detalle();
   if($('seedb')) $('seedb').classList.toggle('hide',Object.keys(P).length>0)}
 function chips(){
   if($('dchips')) $('dchips').innerHTML=CONFIG.DESTINOS.map(d=>`<button type="button" class="chip ${destSel===d.k?'on':''}" style="--c:${d.c}" onclick="setDest('${d.k}')">${d.k}</button>`).join('');
@@ -453,7 +458,7 @@ function chips(){
   if($('fchips')) $('fchips').innerHTML=`<button class="chip ${fDest===''?'on':''}" style="--c:#1d3557" onclick="setF('')">TODOS (${cnt('')})</button>`+CONFIG.DESTINOS.map(d=>`<button class="chip ${fDest===d.k?'on':''}" style="--c:${d.c}" onclick="setF('${d.k}')">${d.k} (${cnt(d.k)})</button>`).join('')}
 const setDest=k=>{destSel=k;chips()};
 const setF=k=>{fDest=k;chips();lista()};
-function setEst(e){fEst=e;['LISTO','RETIRADO',''].forEach((x,i)=>{if($('e'+(i+1)))$('e'+(i+1)).classList.toggle('on',x===e)});lista()}
+function setEst(e){fEst=e;['LISTO','RETIRADO','','POR_UBICAR'].forEach((x,i)=>{if($('e'+(i+1)))$('e'+(i+1)).classList.toggle('on',x===e)});lista()}
 function celdaSel(){
   if(!$('cel')) return;
   const cur=$('cel').value,occ=occMap();
@@ -472,21 +477,50 @@ function pickCell(c){
 function addAqui(c){selKey=null;selCell=null;render();if($('cel'))$('cel').value=c;if($('ped'))$('ped').focus()}
 function pickPedido(k){selKey=k;selCell=null;render();if($('det'))$('det').scrollIntoView({behavior:'smooth',block:'nearest'})}
 
-/* ---- AGREGADO: Notificación por WhatsApp / Mail de pedido listo ---- */
-function avisarPedidoListo(k){
-  const p=P[k]; if(!p) return;
-  const msg=`Hola ${esc(p.cl)}! 👋 Tu pedido N° ${esc(p.n)} ya está listo para retirar.\n\n📍 Posición en mueble / Celda: *${esc(p.c)}*\n🏢 Lugar: ${CONFIG.LUGAR_RETIRO}\n\nPor favor mostrá este mensaje o tu número de pedido al retirar.`;
-  const waNum=p.wa?CONFIG.PREFIJO_WA+dig(p.wa).slice(-10):'';
-  const wl=waNum?`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`:`https://wa.me/?text=${encodeURIComponent(msg)}`;
-  
-  $('avbody').innerHTML=`<div class="okbox">📦 Aviso de Pedido Listo</div>
-    <div class="small"><b>Cliente:</b> ${esc(p.cl)} | <b>Pedido N°:</b> ${esc(p.n)}</div>
+/* ---- Pedidos que vienen de ROTURAS: por ubicar -> ubicar en celda -> avisar ---- */
+const UCEL={};
+function ubicarCard(){
+  const el=$('ubicar');if(!el)return;
+  const L=Object.entries(P).filter(([k,p])=>p.e==='POR_UBICAR').sort((a,b)=>a[1].t-b[1].t);
+  if(!L.length){el.classList.add('hide');el.innerHTML='';return}
+  const occ=occMap(),libres=CELDAS.filter(c=>!occ[c]);
+  el.classList.remove('hide');
+  el.innerHTML=`<h2>🧾 Facturados · por ubicar <span class="small">· ${L.length}</span></h2>
+  <p class="small" style="margin:-6px 0 10px">Vienen de Roturas con el remito ya cargado. Elegí la celda y tocá <b>Ubicar y avisar</b>.</p>`+
+  L.map(([k,p])=>{
+    const cur=UCEL[k]&&CELDAS.includes(UCEL[k])?UCEL[k]:(libres[0]||CELDAS[0]);
+    return `<div class="sr" style="cursor:default;flex-wrap:wrap"><div style="flex:1;min-width:180px"><b>${esc(p.cl)}</b> <span class="small">Remito ${esc(p.n)}</span><div class="small">${esc(p.pr||p.o||'')}</div></div>
+    <div class="cellact"><select id="uc_${k}" onchange="UCEL['${k}']=this.value">${CELDAS.map(c=>`<option value="${c}" ${c===cur?'selected':''}>${c} · ${occ[c]?'ocupada ('+occ[c].length+')':'libre'}</option>`).join('')}</select>
+    <button class="pri" onclick="ubicar('${k}')">📍 Ubicar y avisar</button><button onclick="pickPedido('${k}')">Ver</button></div></div>`}).join('')}
+async function ubicar(k,selId){
+  const p=P[k],sel=$(selId||'uc_'+k);if(!p||!sel)return;
+  const c=sel.value;if(!c){alert('Elegí una celda.');return}
+  try{
+    const p2={...p,c,e:'LISTO',tu:Date.now()};
+    await dbSet('pedidos/'+k,p2);P[k]=p2;delete UCEL[k];selKey=k;
+    await refresh();avisarPedidoListo(k,true)
+  }catch(e){alert('No se pudo ubicar el pedido. Revisá la conexión.')}}
+
+/* ---- Aviso de pedido listo (WhatsApp / mail) con la celda ---- */
+function avisarPedidoListo(k,nuevo){
+  const p=P[k];if(!p||p.e!=='LISTO')return;
+  const msg=`Hola ${prim(p.cl)}! 👋 Tu pedido N° ${p.n} ya está listo para retirar.${p.pr?'\n\n🐾 '+p.pr:''}\n\n📍 Celda del mueble: *${p.c}*\n🏢 Lugar: ${CONFIG.LUGAR_RETIRO}\n\nMostrá este mensaje o tu número de pedido al retirar.\n\n${CONFIG.FIRMA_MSG}`;
+  const waNum=p.wa&&dig(p.wa).length>=10?CONFIG.PREFIJO_WA+dig(p.wa).slice(-10):'';
+  const wl=`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`;
+  const ml=p.em?`mailto:${p.em}?subject=${encodeURIComponent('Tu pedido está listo para retirar')}&body=${encodeURIComponent(msg)}`:'';
+  $('avbody').innerHTML=`<div class="okbox">📦 ${nuevo?'Pedido ubicado · avisar':'Aviso de pedido listo'}</div>
+    <div class="small"><b>Cliente:</b> ${esc(p.cl)} | <b>Pedido N°:</b> ${esc(p.n)}${p.av?' | <b>Último aviso:</b> '+fh(p.av):''}</div>
     <div class="celda" style="font-size:2.5rem;margin:8px 0">Celda: ${esc(p.c)}</div>
     <div class="msgbox">${esc(msg)}</div>
-    <a class="bl wa" href="${wl}" target="_blank" rel="noopener">📲 Enviar Aviso por WhatsApp</a>
+    <a class="bl wa" href="${wl}" target="_blank" rel="noopener" onclick="marcarAvP('${k}')">📲 Enviar por WhatsApp${p.wa?' ('+esc(p.wa)+')':' (elegir contacto)'}</a>
+    ${ml?`<a class="bl" href="${esc(ml)}" onclick="marcarAvP('${k}')">✉ Enviar por mail (${esc(p.em)})</a>`:''}
+    <div id="avst" class="small" style="margin-top:8px"></div>
+    <button class="full" onclick="$('avmodal').classList.add('hide');etiqueta(P['${k}'])">🖨 Imprimir etiqueta</button>
     <button class="full" onclick="$('avmodal').classList.add('hide')">Cerrar</button>`;
   $('avmodal').classList.remove('hide');
-}
+  if(nuevo&&EJS()&&p.em){$('avst').textContent='Enviando mail automático…';
+    enviarMailJS({em:p.em,nm:p.cl},msg,'Tu pedido está listo para retirar').then(()=>{$('avst').innerHTML='<span class="okbox">✔ Mail enviado automáticamente</span>';marcarAvP(k)}).catch(()=>{$('avst').textContent='⚠ No se pudo enviar el mail automático; usá los botones.'})}}
+async function marcarAvP(k){const p=P[k];if(!p)return;const p2={...p,av:Date.now()};P[k]=p2;try{await dbSet('pedidos/'+k,p2)}catch(e){}render()}
 
 function detalle(){
   const p=P[selKey],d=$('det'),occ=occMap();
@@ -499,29 +533,55 @@ function detalle(){
     ${L.sort((a,b)=>a.t-b.t).map(x=>`<div class="sr" onclick="pickPedido('${pkey(x.n)}')"><div><b>${esc(x.cl)}</b> <span class="small">N° ${esc(x.n)}</span><div>${tag(x.d)}</div></div><b class="c">${esc(x.c)}</b></div>`).join('')}
     <div class="acts"><button class="pri" onclick="addAqui('${esc(selCell)}')">➕ Asignar otro pedido a esta celda</button></div>`;return}
   d.classList.remove('hide');
+  const celdasOpt=sel=>CELDAS.map(c=>`<option value="${c}" ${c===sel?'selected':''}>${c}${occ[c]?' ('+occ[c].length+')':''}</option>`).join('');
+  let acc;
+  if(p.e==='LISTO')acc=`<div class="row"><div><label>Cambiar destino</label><select onchange="cambiar('d',this.value)">${CONFIG.DESTINOS.map(x=>`<option ${x.k===p.d?'selected':''}>${x.k}</option>`).join('')}</select></div>
+  <div><label>Mover a celda</label><select onchange="cambiar('c',this.value)">${celdasOpt(p.c)}</select></div></div>
+  <div class="acts">
+    <button class="pri" onclick="retirar()">✔ Marcar RETIRADO</button>
+    <button onclick="avisarPedidoListo('${selKey}')" style="background:#25d366;color:#04210f;border-color:#25d366">📲 ${p.av?'Reavisar':'Avisar'} pedido listo</button>
+    <button onclick="reimprimir()">🖨 Etiqueta</button>
+    <button onclick="addAqui('${esc(p.c)}')">➕ Otro pedido en ${esc(p.c)}</button>
+    <button onclick="eliminarPedido('${selKey}')">🗑 Eliminar</button>
+  </div>`;
+  else if(p.e==='POR_UBICAR')acc=`<div class="small" style="margin:8px 0">Pedido facturado desde Roturas. Falta darle una celda del mueble.</div>
+  <label>Celda</label><select id="dsel">${celdasOpt(CELDAS.find(c=>!occ[c])||CELDAS[0])}</select>
+  <div class="acts"><button class="pri" onclick="ubicar('${selKey}','dsel')">📍 Ubicar y avisar</button><button onclick="eliminarPedido('${selKey}')">🗑 Eliminar</button></div>`;
+  else acc=`${p.fi?'<div><div class="small">Firma</div><img id="fimg" alt="firma" style="width:100%;max-width:260px;background:#fff;border:1px solid var(--br);border-radius:8px"></div>':''}
+  <div class="acts"><button onclick="reabrir()">↩ Anular retiro</button><button onclick="eliminarPedido('${selKey}')">🗑 Eliminar pedido</button></div>`;
   d.innerHTML=`<h2>Pedido N° ${esc(p.n)} ${estTag(p)}</h2>
   <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div><b style="font-size:1.1rem">${esc(p.cl)}</b><div class="small">Código ${esc(p.co)||'—'}</div></div>${tag(p.d)}</div>
   <div class="celda">${p.e==='LISTO'?esc(p.c):'—'}</div>
-  <dl><dt>Ingreso</dt><dd>${fh(p.t)}</dd>${p.f?`<dt>Retirado</dt><dd>${fh(p.f)}</dd>`:''}${p.rb?`<dt>Retiró</dt><dd>${esc(p.rb)}</dd>`:''}${p.o?`<dt>Obs.</dt><dd>${esc(p.o)}</dd>`:''}</dl>
-  ${p.e==='LISTO'?`<div class="row"><div><label>Cambiar destino</label><select onchange="cambiar('d',this.value)">${CONFIG.DESTINOS.map(x=>`<option ${x.k===p.d?'selected':''}>${x.k}</option>`).join('')}</select></div>
-  <div><label>Mover a celda</label><select onchange="cambiar('c',this.value)">${CELDAS.map(c=>`<option value="${c}" ${c===p.c?'selected':''}>${c}${occ[c]?' ('+occ[c].length+')':''}</option>`).join('')}</select></div></div>
-  <div class="acts">
-    <button class="pri" onclick="retirar()">✔ Marcar RETIRADO</button>
-    <button onclick="avisarPedidoListo('${selKey}')" style="background:#25d366;color:#04210f;border-color:#25d366">📲 Avisar Pedido Listo</button>
-    <button onclick="reimprimir()">🖨 Etiqueta</button>
-    <button onclick="addAqui('${esc(p.c)}')">➕ Otro pedido en ${esc(p.c)}</button>
-  </div>`
-  :`${p.fi?'<div><div class="small">Firma</div><img id="fimg" alt="firma" style="width:100%;max-width:260px;background:#fff;border:1px solid var(--br);border-radius:8px"></div>':''}<div class="acts"><button onclick="reabrir()">↩ Volver a EN ESPERA</button></div>`}`;
-  if(p.e!=='LISTO'&&p.fi){const k=selKey;dbGet('firmas/'+k).then(f=>{const im=$('fimg');if(im&&selKey===k&&typeof f==='string'&&f.startsWith('data:image/png;base64,'))im.src=f}).catch(()=>{})}}
+  <dl><dt>Ingreso</dt><dd>${fh(p.t)}</dd>${p.pr?`<dt>Producto</dt><dd>${esc(p.pr)}</dd>`:''}${p.av?`<dt>Avisado</dt><dd>${fh(p.av)}</dd>`:''}${p.f?`<dt>Retirado</dt><dd>${fh(p.f)}</dd>`:''}${p.rb?`<dt>Retiró</dt><dd>${esc(p.rb)}</dd>`:''}${p.o?`<dt>Obs.</dt><dd>${esc(p.o)}</dd>`:''}</dl>${acc}`;
+  if(p.e==='RETIRADO'&&p.fi){const k=selKey;dbGet('firmas/'+k).then(f=>{const im=$('fimg');if(im&&selKey===k&&typeof f==='string'&&f.startsWith('data:image/png;base64,'))im.src=f}).catch(()=>{})}}
 async function cambiar(f,v){
   const p=P[selKey];if(!p||p[f]===v)return;
   try{await dbSet('pedidos/'+selKey,{...p,[f]:v});await refresh()}catch(e){alert('No se pudo guardar el cambio.')}}
 async function retirar(){
   const p=P[selKey];if(!p)return;
-  try{await dbSet('pedidos/'+selKey,{...p,e:'RETIRADO',f:Date.now()});const c=p.c;selKey=null;if($('q'))$('q').value='';if($('sres'))$('sres').innerHTML='';await refresh();if((occMap()[c]||[]).length){selCell=c;render()}}catch(e){alert('No se pudo registrar el retiro.')}}
+  try{const now=Date.now();await dbSet('pedidos/'+selKey,{...p,e:'RETIRADO',f:now});if(p.ro)await roturaRetirada(p.ro,now,'');const c=p.c;selKey=null;if($('q'))$('q').value='';if($('sres'))$('sres').innerHTML='';await refresh();if((occMap()[c]||[]).length){selCell=c;render()}}catch(e){alert('No se pudo registrar el retiro.')}}
+/* ---- ANULAR retiro / eliminar pedido (errores o pruebas) ---- */
+async function roturaRetirada(rid,f,rb){
+  try{const r=await dbGet('roturas/'+rid);if(r&&r.e==='FACTURADA'){await dbSet('roturas/'+rid,{...r,e:'RETIRADA',f,rb:rb||''})}}catch(e){}}
+async function anularRetiroCore(k){
+  const p=await dbGet('pedidos/'+k);if(!p||p.e!=='RETIRADO')return;
+  const q={...p,e:p.c?'LISTO':'POR_UBICAR'};delete q.f;delete q.rb;delete q.fi;
+  await dbSet('pedidos/'+k,q);await dbSet('firmas/'+k,null);
+  if(p.ro){const r=await dbGet('roturas/'+p.ro);
+    if(r&&r.e==='RETIRADA'){const r2={...r,e:'FACTURADA'};delete r2.f;delete r2.rb;await dbSet('roturas/'+p.ro,r2)}}}
 async function reabrir(){
-  const p=P[selKey];if(!p)return;
-  try{const q={...p,e:'LISTO'};delete q.f;await dbSet('pedidos/'+selKey,q);await refresh()}catch(e){alert('Error.')}}
+  const p=P[selKey];if(!p||p.e!=='RETIRADO')return;
+  if(!confirm(`¿Anular el retiro del pedido N° ${p.n}${p.rb?' (retirado por '+p.rb+')':''}?\n\nSe borra la firma y el pedido vuelve a EN ESPERA.`))return;
+  try{await anularRetiroCore(selKey);await refresh();refreshR()}catch(e){alert('No se pudo anular el retiro.')}}
+async function eliminarPedido(k){
+  const p=P[k];if(!p)return;
+  if(!confirm(`¿Eliminar el pedido N° ${p.n} (${p.cl})?${p.ro?'\n\nLa rotura vuelve a "pendiente de remito".':''}\n\nNo se puede deshacer.`))return;
+  try{
+    if(p.ro){const r=await dbGet('roturas/'+p.ro);
+      if(r&&(r.e==='FACTURADA'||r.e==='RETIRADA')){const r2={...r,e:'ASIGNADA'};['rm','pd','f','rb','tf'].forEach(x=>delete r2[x]);await dbSet('roturas/'+p.ro,r2)}}
+    await dbSet('pedidos/'+k,null);await dbSet('firmas/'+k,null);
+    if(selKey===k)selKey=null;delete P[k];await refresh();refreshR()
+  }catch(e){alert('No se pudo eliminar.')}}
 async function guardar(imprimir){
   const g=id=>$(id).value.trim(),n=g('ped'),cel=$('cel').value;
   if(!n||!g('cli')){$('err').textContent='Completá N° de pedido y cliente.';return}
@@ -529,7 +589,7 @@ async function guardar(imprimir){
   $('err').textContent='';
   try{
     P=(await dbGet('pedidos'))||{};const k=pkey(n);
-    if(P[k]&&P[k].e==='LISTO'){$('err').textContent='Ya hay un pedido en espera con ese número.';render();return}
+    if(P[k]&&P[k].e!=='RETIRADO'){$('err').textContent='Ya hay un pedido en espera con ese número.';render();return}
     const p={n,cl:g('cli').toUpperCase(),co:g('cod'),d:destSel,c:cel,e:'LISTO',t:Date.now(),o:g('obs')};
     await dbSet('pedidos/'+k,p);
     $('res').classList.remove('hide');$('res').innerHTML=`<div style="text-align:center"><div class="small">COLOCAR EL PEDIDO EN LA CELDA</div><div class="celda">${esc(cel)}</div>${tag(p.d)}<div style="margin-top:6px"><b>${esc(p.cl)}</b> · N° ${esc(n)}</div></div>`;
@@ -624,6 +684,7 @@ function initR(){
   if($('stform'))$('stform').innerHTML=formAnotar('s','Anotar pedido');
 }
 function setTab(t){
+  if(t==='P')refresh();
   if($('tabP'))$('tabP').classList.toggle('hide',t!=='P');
   if($('tabR'))$('tabR').classList.toggle('hide',t!=='R');
   if($('tbP'))$('tbP').classList.toggle('on',t==='P');
@@ -642,14 +703,14 @@ async function refreshR(soft){
 function cola(r){
   const mes=mesKey();
   return Object.values(A).filter(a=>a.e==='ESPERA'&&(a.pr==='*'||a.pr===r.k)&&usadas(a.pk,mes)<LIM).sort((a,b)=>a.t-b.t)}
-const estR=r=>r.e==='DISPONIBLE'?'<span class="est">SIN ASIGNAR</span>':(r.e==='ASIGNADA'||r.e==='FACTURADA')?'<span class="est b">POR RETIRAR / EN PROCESO</span>':'<span class="est r">RETIRADA</span>';
+const estR=r=>r.e==='DISPONIBLE'?'<span class="est">SIN ASIGNAR</span>':r.e==='ASIGNADA'?'<span class="est b">PENDIENTE DE REMITO</span>':r.e==='FACTURADA'?'<span class="est b" style="background:#7c3aed">EN PEDIDOS</span>':'<span class="est r">RETIRADA</span>';
 
 function renderR(){
   if(!$('tabR'))return;
   const mes=mesKey(),rs=Object.values(R),as=Object.values(A);
   if($('r1'))$('r1').textContent=rs.filter(r=>r.e==='DISPONIBLE').length;
   if($('r2'))$('r2').textContent=as.filter(a=>a.e==='ESPERA').length;
-  if($('r3'))$('r3').textContent=rs.filter(r=>r.e==='ASIGNADA').length;
+  if($('r3'))$('r3').textContent=rs.filter(r=>r.e==='ASIGNADA'||r.e==='FACTURADA').length;
   if($('r4'))$('r4').textContent=rs.filter(r=>r.e==='RETIRADA'&&r.f&&mesKey(r.f)===mes).length;
 
   const porP={};as.forEach(x=>{(porP[x.pk]=porP[x.pk]||[]).push(x)});
@@ -667,11 +728,11 @@ function renderR(){
     return `<div style="margin-bottom:10px"><b>${esc(p.n)}</b> ${d?`<span class="est">${d} sin asignar</span>`:''}<ol class="small" style="margin:4px 0 0 18px;padding:0">${q.map(x=>`<li>${esc(x.nm)}${x.pr==='*'?' (cualquiera)':''}${usadas(x.pk,mes)>=LIM?' · <span style="color:var(--bad)">sin cupo este mes</span>':''}</li>`).join('')}</ol></div>`}).join('')||'<div class="small">Sin pedidos en espera.</div>';
 
   const cnt=e=>rs.filter(r=>!e||r.e===e).length;
-  if($('rchips'))$('rchips').innerHTML=[['DISPONIBLE','SIN ASIGNAR','#f59e0b'],['ASIGNADA','POR RETIRAR','#2563eb'],['RETIRADA','RETIRADAS','#6b7280'],['','TODAS','#1d3557']]
+  if($('rchips'))$('rchips').innerHTML=[['DISPONIBLE','SIN ASIGNAR','#f59e0b'],['ASIGNADA','PENDIENTE DE REMITO','#2563eb'],['FACTURADA','EN PEDIDOS','#7c3aed'],['RETIRADA','RETIRADAS','#6b7280'],['','TODAS','#1d3557']]
     .map(([e,t,c])=>`<button class="chip ${fRot===e?'on':''}" style="--c:${c}" onclick="setFR('${e}')">${t} (${cnt(e)})</button>`).join('');
   const l=rs.filter(r=>!fRot||r.e===fRot).sort((a,b)=>fRot==='DISPONIBLE'?a.t-b.t:(b.ta||b.t)-(a.ta||a.t)).slice(0,200);
   if($('rlist'))$('rlist').innerHTML=l.length?l.map(r=>`<tr><td>${fd(r.t)}</td><td>${esc(r.d)}<div class="small">${r.cod?esc(r.cod)+' · ':''}${esc(r.mo)} · ctl ${esc(r.ct)}</div></td><td>${esc(r.lo)}</td><td>${estR(r)}</td>
-    <td>${r.nm?`<b>${esc(r.nm)}</b><div class="small">${usadas(r.pk,r.m)}/${LIM} en${esc(r.m)}${r.rm?' · remito '+esc(r.rm):''}${r.f?' · retiró '+fd(r.f):''}</div>`:'—'}</td>
+    <td>${r.nm?`<b>${esc(r.nm)}</b><div class="small">${usadas(r.pk,r.m)}/${LIM} en ${esc(r.m)}${r.rm?' · remito '+esc(r.rm):''}${r.f?' · retiró '+(r.rb?esc(r.rb)+' el ':'')+fd(r.f):''}</div>`:'—'}</td>
     <td>${accionR(r,mes)}</td></tr>`).join('')
     :'<tr><td colspan="6" class="small" style="text-align:center;padding:20px">Sin roturas para mostrar.</td></tr>';
 
@@ -684,56 +745,59 @@ function renderR(){
     :'<tr><td colspan="5" class="small" style="text-align:center;padding:20px">Todavía no hay personas anotadas.</td></tr>'}
 const setFR=e=>{fRot=e;renderR()};
 
-/* ---- AGREGADO: Cargar Remito a Rotura y Mover a Pedidos ---- */
+/* ---- Cargar REMITO: la rotura pasa a PEDIDOS (por ubicar) ---- */
 async function facturarRotura(rid){
-  const r=R[rid]; if(!r) return;
-  const rem=prompt('Ingrese el Número de Remito (Facturado):', r.rm||'');
-  if(rem===null) return;
-  if(!rem.trim()){ alert('Debe ingresar un número de remito válido.'); return; }
-  
-  const celdaAssig=prompt('Asignar a una celda del mueble (ej. A1, B2, etc.):', 'A1');
-  if(!celdaAssig) return;
-
-  try {
-    const numRemito = rem.trim();
-    const r2={...r, e:'FACTURADA', rm:numRemito};
-    await dbSet('roturas/'+rid, r2);
-    R[rid]=r2;
-
-    const pKey=pkey(numRemito);
-    const nuevoPedido={
-      n: numRemito,
-      cl: r.nm.toUpperCase(),
-      co: r.cod||'ROTURA',
-      d: 'RETIRA',
-      c: celdaAssig.toUpperCase(),
-      e: 'LISTO',
-      t: Date.now(),
-      o: `Rotura: ${r.d} (Lote: ${r.lo})`,
-      wa: r.wa||''
-    };
-    await dbSet('pedidos/'+pKey, nuevoPedido);
-
-    alert(`✅ Pedido N° ${numRemito} asignado a la celda ${celdaAssig.toUpperCase()} correctamente. Ya podés notificarlo desde la pestaña PEDIDOS.`);
-    await refresh();
-    await refreshR();
-    setTab('P');
-    pickPedido(pKey);
-  } catch(e){ alert('Error al procesar el remito.'); }
-}
+  const r=R[rid];if(!r||r.e!=='ASIGNADA')return;
+  const rem=prompt('N° de remito (facturado) para '+r.nm+':\n'+r.d+' · lote '+r.lo,'');
+  if(rem===null)return;
+  const n=rem.trim();
+  if(!n){alert('Ingresá un número de remito.');return}
+  try{
+    const pk=pkey(n);
+    if(await dbGet('pedidos/'+pk)){alert('Ya existe un pedido con el N° '+n+' en Pedidos. Revisá el número de remito.');return}
+    const pedido={n,cl:r.nm.toUpperCase(),co:r.cod||'ROTURA',d:'RETIRA',c:'',e:'POR_UBICAR',t:Date.now(),o:'Rotura · lote '+r.lo,pr:r.d,wa:r.wa||'',em:r.em||'',ro:rid};
+    const r2={...r,e:'FACTURADA',rm:n,pd:pk,tf:Date.now()};
+    await dbSet('pedidos/'+pk,pedido);await dbSet('roturas/'+rid,r2);R[rid]=r2;
+    await refresh();await refreshR();setTab('P');
+    const u=$('ubicar');if(u&&!u.classList.contains('hide'))u.scrollIntoView({behavior:'smooth',block:'start'})
+  }catch(e){alert('Error al procesar el remito. Revisá la conexión.')}}
+function irPedido(k){setTab('P');if(P[k])pickPedido(k)}
+async function anularRemito(rid){
+  const r=R[rid];if(!r)return;
+  try{
+    const p=r.pd?await dbGet('pedidos/'+r.pd):null;
+    if(p&&p.e==='RETIRADO'){alert('Ese pedido ya fue retirado. Primero anulá el retiro.');return}
+    if(!confirm(`¿Anular el remito ${r.rm||''} de ${r.nm}?\n\nSe quita el pedido de PEDIDOS y la rotura vuelve a "pendiente de remito".`))return;
+    if(r.pd){await dbSet('pedidos/'+r.pd,null);await dbSet('firmas/'+r.pd,null)}
+    const r2={...r,e:'ASIGNADA'};['rm','pd','tf'].forEach(x=>delete r2[x]);
+    await dbSet('roturas/'+rid,r2);R[rid]=r2;await refresh();await refreshR()
+  }catch(e){alert('No se pudo anular el remito.')}}
+async function anularRetiroR(rid){
+  const r=R[rid];if(!r)return;
+  if(!confirm(`¿Anular el retiro de ${r.nm}${r.rb&&r.rb!==r.nm?' (retiró '+r.rb+')':''}?\n\n${r.pd?'El pedido vuelve a EN ESPERA y se borra la firma.':'La rotura vuelve a "pendiente de remito".'}`))return;
+  try{
+    const p=r.pd?await dbGet('pedidos/'+r.pd):null;
+    if(p&&p.e==='RETIRADO'){await anularRetiroCore(r.pd)}
+    else{const r2={...r,e:r.pd?'FACTURADA':'ASIGNADA'};delete r2.f;delete r2.rb;await dbSet('roturas/'+rid,r2);R[rid]=r2}
+    await refresh();await refreshR()
+  }catch(e){alert('No se pudo anular el retiro.')}}
 
 function accionR(r,mes){
   if(r.e==='DISPONIBLE'){
     const c=cola(r);
     if(!c.length)return `<div class="cellact"><span class="small">Sin anotados para este producto</span><button onclick="borrarR('${r.id}')" title="Eliminar">🗑</button></div>`;
-    return `<div class="cellact"><button class="pri" onclick="asignar('${r.id}','${c[0].id}')">Asignar a ${esc(c[0].nm.split(' ')[0])} y avisar</button>
+    return `<div class="cellact"><button class="pri" onclick="asignar('${r.id}','${c[0].id}')">Asignar a ${esc(c[0].nm.split(' ')[0])}</button>
     ${c.length>1?`<select onchange="if(this.value)asignar('${r.id}',this.value)"><option value="">Otro…</option>${c.map(a=>`<option value="${a.id}">${esc(a.nm)} (${usadas(a.pk,mes)}/${LIM})</option>`).join('')}</select>`:''}
     <button onclick="borrarR('${r.id}')" title="Eliminar">🗑</button></div>`}
   if(r.e==='ASIGNADA')return `<div class="cellact">
-    <button class="pri" onclick="facturarRotura('${r.id}')">📄 Remito / Pasar a Pedidos</button>
-    <button onclick="avisar('${r.id}')">📲 ${r.av?'Reavisar':'Avisar'}</button>
+    <button class="pri" onclick="facturarRotura('${r.id}')">📄 Cargar remito</button>
+    <button onclick="avisar('${r.id}')">📲 ${r.av?'Reavisar':'Avisar'} asignación</button>
     <button onclick="liberar('${r.id}')">↩ Liberar</button>
     ${r.av?'<span class="small">avisado '+fh(r.av)+'</span>':''}</div>`;
+  if(r.e==='FACTURADA'){const p=P[r.pd];
+    const st=p?(p.e==='POR_UBICAR'?'Falta ubicar en una celda':p.e==='LISTO'?'En celda '+esc(p.c)+(p.av?' · avisado':' · sin avisar'):''):'En Pedidos';
+    return `<div class="cellact"><span class="small">${st}</span><button onclick="irPedido('${r.pd}')">👁 Ver en Pedidos</button><button onclick="anularRemito('${r.id}')">↩ Anular remito</button></div>`}
+  if(r.e==='RETIRADA')return `<div class="cellact"><button onclick="anularRetiroR('${r.id}')">↩ Anular retiro</button></div>`;
   return '<span class="small">—</span>'}
 
 async function guardarRotura(){
@@ -746,7 +810,7 @@ async function guardarRotura(){
     $('rl').value='';$('rc').value=1;fRot='DISPONIBLE';
     const c=cola(nuevas[0]);
     $('rres').classList.remove('hide');$('rres').innerHTML=`<div class="okbox">✔ ${n} ${plural(n,'bolsa registrada','bolsas registradas')}</div><div><b>${esc(prod.n)}</b> · lote ${esc(lo)}</div>
-      <p class="small" style="margin:8px 0 0">${c.length?`Hay ${c.length}${plural(c.length,'persona anotada','personas anotadas')} con cupo. Primera en la fila: <b>${esc(c[0].nm)}</b>. Asignala desde la tabla de abajo.`:'Todavía no hay nadie anotado con cupo para este producto; la bolsa queda sin asignar.'}</p>`;
+      <p class="small" style="margin:8px 0 0">${c.length?`Hay ${c.length} ${plural(c.length,'persona anotada','personas anotadas')} con cupo. Primera en la fila: <b>${esc(c[0].nm)}</b>. Asignala desde la tabla de abajo.`:'Todavía no hay nadie anotado con cupo para este producto; la bolsa queda sin asignar.'}</p>`;
     await refreshR()
   }catch(e){$('rerr').textContent='No se pudo guardar. Revisá la conexión.'}}
 
@@ -762,31 +826,29 @@ async function asignar(rid,aid){
     if(usadas(a.pk,mes)>=LIM){alert(a.nm+' ya completó su cupo de '+LIM+' este mes.');return}
     const r2={...r,e:'ASIGNADA',a:aid,pk:a.pk,nm:a.nm,wa:a.wa,em:a.em||'',m:mes,ta:Date.now()};
     await dbSet('roturas/'+rid,r2);await dbSet(`anot/${a.pk}/${aid}`,{...af,e:'ASIGNADO',r:rid});
-    R[rid]=r2;A[aid]={...af,e:'ASIGNADO',r:rid};await syncCupo(a.pk,mes);renderR();avisar(rid,true)
+    R[rid]=r2;A[aid]={...af,e:'ASIGNADO',r:rid};await syncCupo(a.pk,mes);renderR();
+    $('rres').classList.remove('hide');$('rres').innerHTML=`<div class="okbox">✔ Bolsa asignada a ${esc(a.nm)}</div><div class="small">${esc(r.d)} · lote ${esc(r.lo)}<br>Queda <b>pendiente de remito</b>: cuando la facturen, tocá “Cargar remito” y pasa a PEDIDOS.</div>`
   }catch(e){alert('No se pudo asignar. Revisá la conexión.')}}
 
 function mensaje(r){
   const u=usadas(r.pk,r.m),q=rest(u);
-  return `Hola ${r.nm.split(' ')[0]}! 👋 Ya podés retirar tu bolsa: ${r.d} (lote ${r.lo}). Pasá a buscarla por ${CONFIG.LUGAR_RETIRO}.\n\nCon esta bolsa llevás ${u} de ${LIM} del mes. ${q?`Te ${plural(q,'queda','quedan')} ${q}${plural(q,'bolsa disponible','bolsas disponibles')} para retirar este mes.`:'Es la última que podés retirar este mes.'}\n\n${CONFIG.FIRMA_MSG}`}
+  return `Hola ${prim(r.nm)}! 👋 Te asignamos tu bolsa: ${r.d} (lote ${r.lo}). Estamos gestionando la facturación; apenas esté lista te avisamos en qué celda del mueble la podés retirar por ${CONFIG.LUGAR_RETIRO}.\n\nCon esta bolsa llevás ${u} de ${LIM} del mes. ${q?`Te ${plural(q,'queda','quedan')} ${q} ${plural(q,'bolsa disponible','bolsas disponibles')} para este mes.`:'Es la última que podés retirar este mes.'}\n\n${CONFIG.FIRMA_MSG}`}
 const EJS=()=>CONFIG.EMAILJS&&CONFIG.EMAILJS.service&&CONFIG.EMAILJS.template&&CONFIG.EMAILJS.key;
-async function enviarMailJS(r,msg){
+async function enviarMailJS(r,msg,subj){
   const E=CONFIG.EMAILJS,x=await fetch('https://api.emailjs.com/api/v1.0/email/send',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({service_id:E.service,template_id:E.template,user_id:E.key,template_params:{to_email:r.em,to_name:r.nm,subject:'Tu bolsa para retirar: '+r.d,message:msg}})});
+    body:JSON.stringify({service_id:E.service,template_id:E.template,user_id:E.key,template_params:{to_email:r.em,to_name:r.nm,subject:subj||('Tu bolsa para retirar: '+r.d),message:msg}})});
   if(!x.ok)throw new Error('mail')}
 async function marcarAv(rid){const r=R[rid];if(!r)return;const r2={...r,av:Date.now()};R[rid]=r2;try{await dbSet('roturas/'+rid,r2)}catch(e){}renderR()}
-function avisar(rid,nuevo){
+function avisar(rid){
   const r=R[rid];if(!r)return;
   const msg=mensaje(r),wl=`https://wa.me/${CONFIG.PREFIJO_WA}${dig(r.wa).slice(-10)}?text=${encodeURIComponent(msg)}`,
-    ml=r.em?`mailto:${r.em}?subject=${encodeURIComponent('Tu bolsa para retirar: '+r.d)}&body=${encodeURIComponent(msg)}`:'';
-  $('avbody').innerHTML=`<div class="okbox">${nuevo?'✔ Bolsa asignada':'Aviso'} a ${esc(r.nm)}</div>
+    ml=r.em?`mailto:${r.em}?subject=${encodeURIComponent('Te asignamos tu bolsa: '+r.d)}&body=${encodeURIComponent(msg)}`:'';
+  $('avbody').innerHTML=`<div class="okbox">Aviso de asignación a ${esc(r.nm)}</div>
     <div class="small">${esc(r.d)} · lote ${esc(r.lo)}</div><div class="msgbox">${esc(msg)}</div>
     <a class="bl wa" href="${wl}" target="_blank" rel="noopener" onclick="marcarAv('${rid}')">📲 Enviar por WhatsApp (${esc(r.wa)})</a>
     ${ml?`<a class="bl" href="${esc(ml)}" onclick="marcarAv('${rid}')">✉ Enviar por mail (${esc(r.em)})</a>`:'<div class="small" style="margin-top:8px">Esta persona no dejó mail.</div>'}
-    <div id="avst" class="small" style="margin-top:8px"></div>
     <button class="full" onclick="$('avmodal').classList.add('hide')">Cerrar</button>`;
-  $('avmodal').classList.remove('hide');
-  if(nuevo&&EJS()&&r.em){$('avst').textContent='Enviando mail automático…';
-    enviarMailJS(r,msg).then(()=>{$('avst').innerHTML='<span class="okbox">✔ Mail enviado automáticamente</span>';marcarAv(rid)}).catch(()=>{$('avst').textContent='⚠ No se pudo enviar el mail automático; usá los botones.'})}}
+  $('avmodal').classList.remove('hide')}
 
 async function retirarR(rid){
   const r=R[rid];if(!r)return;
@@ -880,7 +942,7 @@ function iniciarPanel(){
   initR();
   refresh();
   refreshR();
-  setInterval(()=>{refresh();refreshR(true)},15000);
+  setInterval(()=>{const a=document.activeElement;if(a&&a.closest&&a.closest('#ubicar'))return;refresh();refreshR(true)},15000);
   if($('q'))$('q').focus();
 }
 
