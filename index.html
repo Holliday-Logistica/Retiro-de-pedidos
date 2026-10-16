@@ -287,7 +287,7 @@ const CONFIG={
   PREFIJO_WA:'549',                  // Argentina: 549 + área + número (sin 0 ni 15)
   LUGAR_RETIRO:'el mostrador',       // texto que va en el aviso
   FIRMA_MSG:'Retiro de roturas · Logística',
-  MOTIVOS:['Roturas en deposito'],
+  MOTIVOS:['Roturas en deposito','Roturas en pallets cerrado','Descarte (R)','Roturas bolsa despegada'],
   /* COMPLETAR los códigos que faltan */
   PRODUCTOS:[
     {k:'articular2',n:'MV ARTICULAR X 2 KG',c:''},
@@ -541,6 +541,7 @@ function detalle(){
     <button class="pri" onclick="retirar()">✔ Marcar RETIRADO</button>
     <button onclick="avisarPedidoListo('${selKey}')" style="background:#25d366;color:#04210f;border-color:#25d366">📲 ${p.av?'Reavisar':'Avisar'} pedido listo</button>
     <button onclick="reimprimir()">🖨 Etiqueta</button>
+    <button onclick="sinUbicar('${selKey}')">↩ Devolver a sin ubicar</button>
     <button onclick="addAqui('${esc(p.c)}')">➕ Otro pedido en ${esc(p.c)}</button>
     <button onclick="eliminarPedido('${selKey}')">🗑 Eliminar</button>
   </div>`;
@@ -554,6 +555,12 @@ function detalle(){
   <div class="celda">${p.e==='LISTO'?esc(p.c):'—'}</div>
   <dl><dt>Ingreso</dt><dd>${fh(p.t)}</dd>${p.pr?`<dt>Producto</dt><dd>${esc(p.pr)}</dd>`:''}${p.av?`<dt>Avisado</dt><dd>${fh(p.av)}</dd>`:''}${p.f?`<dt>Retirado</dt><dd>${fh(p.f)}</dd>`:''}${p.rb?`<dt>Retiró</dt><dd>${esc(p.rb)}</dd>`:''}${p.o?`<dt>Obs.</dt><dd>${esc(p.o)}</dd>`:''}</dl>${acc}`;
   if(p.e==='RETIRADO'&&p.fi){const k=selKey;dbGet('firmas/'+k).then(f=>{const im=$('fimg');if(im&&selKey===k&&typeof f==='string'&&f.startsWith('data:image/png;base64,'))im.src=f}).catch(()=>{})}}
+async function sinUbicar(k){
+  const p=P[k];if(!p||p.e!=='LISTO')return;
+  if(!confirm(`¿Devolver el pedido N° ${p.n} (${p.cl}) a "sin ubicar"?\n\nSe libera la celda ${p.c} y después podés ubicarlo en otra.`))return;
+  try{const q={...p,e:'POR_UBICAR'};['c','tu','av'].forEach(x=>delete q[x]);
+    await dbSet('pedidos/'+k,q);P[k]=q;selKey=k;await refresh()}
+  catch(e){alert('No se pudo devolver el pedido a sin ubicar.')}}
 async function cambiar(f,v){
   const p=P[selKey];if(!p||p[f]===v)return;
   try{await dbSet('pedidos/'+selKey,{...p,[f]:v});await refresh()}catch(e){alert('No se pudo guardar el cambio.')}}
@@ -814,7 +821,7 @@ async function guardarRotura(){
     await refreshR()
   }catch(e){$('rerr').textContent='No se pudo guardar. Revisá la conexión.'}}
 
-async function syncCupo(pk,mes){await dbSet(`cupo/${pk}/${mes}`,usadas(pk,mes))}
+async function syncCupo(pk,mes){try{await dbSet(`cupo/${pk}/${mes}`,usadas(pk,mes))}catch(e){console.warn('syncCupo',e)}}
 
 async function asignar(rid,aid){
   try{
@@ -828,7 +835,7 @@ async function asignar(rid,aid){
     await dbSet('roturas/'+rid,r2);await dbSet(`anot/${a.pk}/${aid}`,{...af,e:'ASIGNADO',r:rid});
     R[rid]=r2;A[aid]={...af,e:'ASIGNADO',r:rid};await syncCupo(a.pk,mes);renderR();
     $('rres').classList.remove('hide');$('rres').innerHTML=`<div class="okbox">✔ Bolsa asignada a ${esc(a.nm)}</div><div class="small">${esc(r.d)} · lote ${esc(r.lo)}<br>Queda <b>pendiente de remito</b>: cuando la facturen, tocá “Cargar remito” y pasa a PEDIDOS.</div>`
-  }catch(e){alert('No se pudo asignar. Revisá la conexión.')}}
+  }catch(e){console.error('asignar',e);try{await refreshR()}catch(_){}}}
 
 function mensaje(r){
   const u=usadas(r.pk,r.m),q=rest(u);
@@ -862,7 +869,7 @@ async function liberar(rid){
     await dbSet('roturas/'+rid,base);R[rid]=base;
     const a=A[r.a];if(a){const a2={...a,e:'ESPERA'};delete a2.r;await dbSet(`anot/${a.pk}/${a.id}`,a2);A[a.id]=a2}
     await syncCupo(r.pk,r.m);renderR()
-  }catch(e){alert('No se pudo liberar.')}}
+  }catch(e){console.error('liberar',e);try{await refreshR()}catch(_){}}}
 async function borrarR(rid){if(!confirm('¿Eliminar esta bolsa registrada?'))return;try{await dbSet('roturas/'+rid,null);delete R[rid];renderR()}catch(e){alert('Error.')}}
 async function cancelarAnot(aid){const a=A[aid];if(!a||!confirm('¿Quitar a '+a.nm+' de la lista de espera?'))return;try{await dbSet(`anot/${a.pk}/${aid}`,null);delete A[aid];renderR()}catch(e){alert('Error.')}}
 
