@@ -93,6 +93,7 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
 .lbl .q img,.lbl .q canvas,.ins .q img,.ins .q canvas{width:100%!important;height:100%!important;image-rendering:pixelated;display:block}
 .lbl .cel{flex:1;min-width:0}.lbl .cel small{display:block;font-size:4mm;font-weight:700;letter-spacing:.2em}
 .lbl .cel b{font-size:19mm;line-height:1;font-weight:900;color:#e2211c}
+.lbl .cel .bq{font-size:3.4mm;font-weight:700;margin-top:1.5mm;line-height:1.25}.lbl .cel .bq span{font-size:4.8mm;font-weight:900}
 .lbl .pn{font-size:7mm;font-weight:900}
 .lbl .s{font-size:3mm;font-weight:700}
 @media print{
@@ -177,9 +178,9 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
         <label>Cliente *</label><input id="cli" autocomplete="off" placeholder="Nombre o empresa" style="text-transform:uppercase">
         <label>Destino *</label><div class="chips" id="dchips"></div>
         <div class="row">
-          <div><label>Celda del mueble</label><select id="cel"></select></div>
           <div><label>Observaciones</label><input id="obs" autocomplete="off"></div>
         </div>
+        <label>Celda del mueble y cantidad de bultos</label><div id="cfw"></div>
         <div class="err" id="err"></div>
         <div class="acts"><button onclick="guardar(false)">Guardar</button><button class="pri" onclick="guardar(true)">Guardar e imprimir etiqueta</button></div>
       </div>
@@ -359,6 +360,27 @@ async function dbSet(p,val){
 const b64e=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 const b64d=s=>JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g,'+').replace(/_/g,'/')))));
 
+/* ---- celdas y bultos: un pedido puede ocupar varias celdas, cada una con su cantidad de bultos ---- */
+const cellsOf=p=>Array.isArray(p.cs)&&p.cs.length?p.cs.map(x=>x.c):(p.c?[p.c]:[]);
+const csOf=p=>Array.isArray(p.cs)&&p.cs.length?p.cs:(p.c?[{c:p.c,b:+p.bt||0}]:[]);
+const bultosTot=p=>csOf(p).reduce((a,x)=>a+(+x.b||0),0);
+const bTxt=n=>n+(n===1?' bulto':' bultos');
+function bultosLine(p){const cs=csOf(p),t=bultosTot(p);if(!t)return '';
+  return cs.length>1?cs.map(x=>esc(x.c)+(x.b?': '+bTxt(+x.b):'')).join(' · ')+' · <b>Total '+bTxt(t)+'</b>':'<b>'+bTxt(t)+'</b>'}
+function celdaBig(p,pre,st){const n=cellsOf(p).length,fs=n>2?'2.2rem':n>1?'3rem':'',bl=bultosLine(p);
+  return `<div class="celda" style="${st||''}${fs?';font-size:'+fs:''}">${pre||''}${esc(p.c)}</div>${bl?`<div style="text-align:center;margin-bottom:4px">${bl}</div>`:''}`}
+const cfOpts=sel=>{const occ=occMap();return CELDAS.map(c=>`<option value="${c}" ${c===sel?'selected':''}>${c} · ${occ[c]?'ocupada ('+occ[c].length+')':'libre'}</option>`).join('')};
+const cfRow=(c,b)=>`<div class="cfr" style="display:grid;grid-template-columns:1fr 92px 36px;gap:6px;margin-top:6px"><select class="cfc">${cfOpts(c)}</select><input class="cfb" type="number" min="1" max="9999" inputmode="numeric" placeholder="Bultos" value="${b||''}" oninput="cfTot(this)"><button type="button" style="padding:0" title="Quitar esta celda" onclick="cfDel(this)">✕</button></div>`;
+const cfHTML=(id,cs)=>{const occ=occMap(),lib=CELDAS.find(c=>!occ[c])||CELDAS[0];return `<div id="${id}" class="cf"><div class="cfl">${(cs&&cs.length?cs:[{c:lib}]).map(x=>cfRow(x.c,x.b)).join('')}</div><div class="acts" style="margin-top:6px;align-items:center"><button type="button" onclick="cfAdd(this)">➕ Otra celda (si no entra todo en una)</button><span class="small cft">${cfSum(cs||[])}</span></div></div>`};
+const cfSum=cs=>{const t=cs.reduce((a,x)=>a+(+x.b||0),0);return t?'Total: <b>'+bTxt(t)+'</b>':''};
+function cfRead(root){return [...root.querySelectorAll('.cfr')].map(r=>({c:r.querySelector('.cfc').value,b:parseInt(r.querySelector('.cfb').value)||0}))}
+function cfTot(el){const root=el.closest('.cf');root.querySelector('.cft').innerHTML=cfSum(cfRead(root))}
+function cfAdd(el){const root=el.closest('.cf'),used=cfRead(root).map(x=>x.c),occ=occMap(),c=CELDAS.find(c=>!used.includes(c)&&!occ[c])||CELDAS.find(c=>!used.includes(c))||CELDAS[0];root.querySelector('.cfl').insertAdjacentHTML('beforeend',cfRow(c,''))}
+function cfDel(el){const root=el.closest('.cf');if(root.querySelectorAll('.cfr').length>1){el.closest('.cfr').remove();cfTot(root.querySelector('.cfb'))}}
+function cfGet(id){const root=$(id);if(!root)return{err:'Elegí una celda.'};const raw=cfRead(root);
+  if(new Set(raw.map(x=>x.c)).size<raw.length)return{err:'Elegiste la misma celda dos veces.'};
+  const cs=raw.map(x=>x.b?{c:x.c,b:x.b}:{c:x.c});return{cs,c:cs.map(x=>x.c).join(' + '),bt:cs.reduce((a,x)=>a+(+x.b||0),0)||''}}
+
 /* ---- mueble ---- */
 function planoHTML(occ,sel,pub){
   return '<div class="mueble">'+CONFIG.MUEBLE.map(row=>'<div class="mrow">'+row.map(c=>{
@@ -377,10 +399,10 @@ function buscar(q,list,min){
 function resCardPub(p){
   if(p.e==='POR_UBICAR')return `<div class="card body"><span class="est b">EN PREPARACIÓN</span><h3 style="margin:10px 0 0">${esc(p.cl)}</h3><p class="small">Pedido N° ${esc(p.n)} · todavía no tiene celda asignada. Te avisamos cuando esté listo para retirar.</p></div>`;
   if(p.e!=='LISTO')return `<div class="card body"><span class="est r">YA RETIRADO</span><h3 style="margin:10px 0 0">${esc(p.cl)}</h3><p class="small">Pedido N° ${esc(p.n)} · retirado el ${p.f?fh(p.f):'—'}</p></div>`;
-  return `<div class="card body"><div class="small">TU PEDIDO ESTÁ EN LA CELDA</div><div class="celda">${esc(p.c)}</div>
+  return `<div class="card body"><div class="small">${cellsOf(p).length>1?'TU PEDIDO ESTÁ EN LAS CELDAS':'TU PEDIDO ESTÁ EN LA CELDA'}</div>${celdaBig(p)}
   <div>${tag(p.d)}</div>${p.d==='RETIRA'?'<p style="margin:10px 0 0"><b>Retiralo por el mostrador</b></p>':''}
   <h3 style="margin:12px 0 0">${esc(p.cl)}</h3><div class="small">Pedido N° ${esc(p.n)}</div>
-  <div style="margin-top:14px">${planoHTML({},p.c,true)}</div>
+  <div style="margin-top:14px">${planoHTML({},cellsOf(p),true)}</div>
   ${FB?'<a class="bl" style="background:var(--ac);border-color:var(--ac);color:#ffffff" href="#r='+encodeURIComponent(p.n)+'">✍ Completar retiro y firmar</a>':''}</div>`}
 async function vistaPedido(n){
   $('pub').classList.remove('hide');$('pub').innerHTML='<div class="card body">Buscando…</div>';
@@ -407,8 +429,8 @@ function grupoHTML(i,lista,pre){
   if(!act.length)return `<div class="card body cg3"><h3 style="margin:0">${esc(nombre)}</h3><p>No tiene pedidos pendientes de retiro.</p><p class="small">${ret} pedido(s) ya retirado(s).</p></div>`;
   return `<div class="card cg3" id="g${i}"><h3 style="margin:0 0 4px">${esc(nombre)}</h3>
   <p class="small" style="margin:0 0 10px">${act.length} pedido(s) para retirar. Mirá en qué celda está cada uno:</p>
-  ${planoHTML({},act.map(([k,p])=>p.c),true)}
-  <div style="margin-top:14px">${act.map(([k,p])=>`<label class="pk"><input type="checkbox" data-g="${i}" value="${k}" ${pre?'checked':''}><b class="c">${esc(p.c)}</b><div><b>Pedido N° ${esc(p.n)}</b>${p.pr?'<div class="small">'+esc(p.pr)+'</div>':''}<div>${tag(p.d)}</div></div></label>`).join('')}</div>
+  ${planoHTML({},act.flatMap(([k,p])=>cellsOf(p)),true)}
+  <div style="margin-top:14px">${act.map(([k,p])=>`<label class="pk"><input type="checkbox" data-g="${i}" value="${k}" ${pre?'checked':''}><b class="c">${esc(p.c)}</b><div><b>Pedido N° ${esc(p.n)}</b>${p.pr?'<div class="small">'+esc(p.pr)+'</div>':''}${bultosLine(p)?'<div class="small">📦 '+bultosLine(p)+'</div>':''}<div>${tag(p.d)}</div></div></label>`).join('')}</div>
   <p class="small" style="margin:12px 0 4px"><b>Cuando lo retires,</b> tildá lo que te llevás y firmá:</p>
   <label>Nombre y apellido de quien retira</label><input id="rn${i}" autocomplete="off">
   <label>Firma</label><canvas id="sg${i}" class="firma"></canvas>
@@ -472,7 +494,7 @@ async function vistaSnapshot(txt){
 /* ---- panel de mostrador ---- */
 let P={},selKey=null,destSel=CONFIG.DESTINOS[0].k,fDest='',fEst='LISTO';
 const activos=()=>Object.values(P).filter(p=>p.e==='LISTO');
-const occMap=()=>{const o={};activos().forEach(p=>{(o[p.c]=o[p.c]||[]).push(p)});return o};
+const occMap=()=>{const o={};activos().forEach(p=>cellsOf(p).forEach(c=>{(o[c]=o[c]||[]).push(p)}));return o};
 let selCell=null;
 async function refresh(){
   try{P=(await dbGet('pedidos'))||{};if($('modo')) $('modo').textContent=FB?'🟢 Base de datos compartida conectada':'💻 Datos guardados en este equipo · los QR de las etiquetas se leen desde cualquier celular'}
@@ -485,7 +507,7 @@ function render(){
   if($('s3')) $('s3').textContent=n;
   if($('s4')) $('s4').textContent=CELDAS.length-n;
   if($('mcnt')) $('mcnt').textContent=`· ${n} ocupadas / ${CELDAS.length-n} libres`;
-  const sel=selKey&&P[selKey]&&P[selKey].e==='LISTO'?P[selKey].c:selCell;
+  const sel=selKey&&P[selKey]&&P[selKey].e==='LISTO'?cellsOf(P[selKey]):selCell;
   if($('plano')) $('plano').innerHTML=planoHTML(occ,sel,false);
   chips();celdaSel();lista();ubicarCard();detalle();
   if($('seedb')) $('seedb').classList.toggle('hide',Object.keys(P).length>0)}
@@ -497,11 +519,10 @@ const setDest=k=>{destSel=k;chips()};
 const setF=k=>{fDest=k;chips();lista()};
 function setEst(e){fEst=e;['LISTO','RETIRADO','','POR_UBICAR'].forEach((x,i)=>{if($('e'+(i+1)))$('e'+(i+1)).classList.toggle('on',x===e)});lista()}
 function celdaSel(){
-  if(!$('cel')) return;
-  const cur=$('cel').value,occ=occMap();
-  const libres=CELDAS.filter(c=>!occ[c]);
-  $('cel').innerHTML=CELDAS.map(c=>`<option value="${c}">${c} · ${occ[c]?'ocupada ('+occ[c].length+')':'libre'}</option>`).join('');
-  if(cur&&CELDAS.includes(cur))$('cel').value=cur;else if(libres.length)$('cel').value=libres[0]}
+  const w=$('cfw');if(!w)return;
+  if(!w.innerHTML.trim()){w.innerHTML=cfHTML('cf');return}
+  w.querySelectorAll('.cfc').forEach(x=>{x.innerHTML=cfOpts(x.value)})}
+const setCel1=c=>{const x=document.querySelector('#cf .cfc');if(x)x.value=c};
 function lista(){
   if(!$('lista')) return;
   const l=Object.entries(P).filter(([k,p])=>(!fEst||p.e===fEst)&&(!fDest||p.d===fDest)).sort((a,b)=>b[1].t-a[1].t).slice(0,200);
@@ -510,8 +531,8 @@ function pickCell(c){
   const L=occMap()[c]||[];
   if(L.length===1){pickPedido(pkey(L[0].n))}
   else if(L.length>1){selKey=null;selCell=c;render();if($('det'))$('det').scrollIntoView({behavior:'smooth',block:'nearest'})}
-  else{selKey=null;selCell=null;render();if($('cel'))$('cel').value=c;if($('ped'))$('ped').focus()}}
-function addAqui(c){selKey=null;selCell=null;render();if($('cel'))$('cel').value=c;if($('ped'))$('ped').focus()}
+  else{selKey=null;selCell=null;render();setCel1(c);if($('ped'))$('ped').focus()}}
+function addAqui(c){selKey=null;selCell=null;render();setCel1(c);if($('ped'))$('ped').focus()}
 function pickPedido(k){selKey=k;selCell=null;render();if($('det'))$('det').scrollIntoView({behavior:'smooth',block:'nearest'})}
 
 /* ---- Pedidos que vienen de ROTURAS: por ubicar -> ubicar en celda -> avisar ---- */
@@ -528,12 +549,13 @@ function ubicarCard(){
     const cur=UCEL[k]&&CELDAS.includes(UCEL[k])?UCEL[k]:(libres[0]||CELDAS[0]);
     return `<div class="sr" style="cursor:default;flex-wrap:wrap"><div style="flex:1;min-width:180px"><b>${esc(p.cl)}</b> <span class="small">Remito ${esc(p.n)}</span><div class="small">${esc(p.pr||p.o||'')}</div></div>
     <div class="cellact"><select id="uc_${k}" onchange="UCEL['${k}']=this.value">${CELDAS.map(c=>`<option value="${c}" ${c===cur?'selected':''}>${c} · ${occ[c]?'ocupada ('+occ[c].length+')':'libre'}</option>`).join('')}</select>
-    <button class="pri" onclick="ubicar('${k}')">📍 Ubicar y avisar</button><button onclick="pickPedido('${k}')">Ver</button></div></div>`}).join('')}
+    <input id="ub_${k}" type="number" min="1" inputmode="numeric" placeholder="Bultos" style="width:84px"><button class="pri" onclick="ubicar('${k}')">📍 Ubicar y avisar</button><button onclick="pickPedido('${k}')">Ver</button></div></div>`}).join('')}
 async function ubicar(k,selId){
-  const p=P[k],sel=$(selId||'uc_'+k);if(!p||!sel)return;
-  const c=sel.value;if(!c){alert('Elegí una celda.');return}
+  const p=P[k];if(!p)return;let cs,c,bt;
+  if(selId==='ud'){const r=cfGet('ud');if(r.err){alert(r.err);return}cs=r.cs;c=r.c;bt=r.bt}
+  else{const sel=$('uc_'+k);if(!sel||!sel.value){alert('Elegí una celda.');return}const b=parseInt(($('ub_'+k)||{}).value)||0;cs=[b?{c:sel.value,b}:{c:sel.value}];c=sel.value;bt=b||''}
   try{
-    const p2={...p,c,e:'LISTO',tu:Date.now()};
+    const p2={...p,c,cs,bt,e:'LISTO',tu:Date.now()};
     await dbSet('pedidos/'+k,p2);P[k]=p2;delete UCEL[k];selKey=k;
     await refresh();avisarPedidoListo(k,true)
   }catch(e){alert('No se pudo ubicar el pedido. Revisá la conexión.')}}
@@ -542,13 +564,13 @@ async function ubicar(k,selId){
 function avisarPedidoListo(k,nuevo){
   const p=P[k];if(!p||p.e!=='LISTO')return;
   const lk=base()+'#r='+encodeURIComponent(p.n);
-  const msg=`Hola ${prim(p.cl)}! 👋 Tu pedido N° ${p.n} ya está listo para retirar.${p.pr?'\n\n🐾 '+p.pr:''}\n\n✍️ Para retirarlo, ingresá a este link (ahí ves dónde está y firmás al llevártelo):\n${lk}\n\n${CONFIG.FIRMA_MSG}`;
+  const msg=`Hola ${prim(p.cl)}! 👋 Tu pedido N° ${p.n} ya está listo para retirar.${p.pr?'\n\n🐾 '+p.pr:''}${bultosTot(p)?'\n📦 '+bTxt(bultosTot(p)):''}\n\n✍️ Para retirarlo, ingresá a este link (ahí ves dónde está y firmás al llevártelo):\n${lk}\n\n${CONFIG.FIRMA_MSG}`;
   const waNum=p.wa&&dig(p.wa).length>=10?CONFIG.PREFIJO_WA+dig(p.wa).slice(-10):'';
   const wl=`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`;
   const ml=p.em?`mailto:${p.em}?subject=${encodeURIComponent('Tu pedido está listo para retirar')}&body=${encodeURIComponent(msg)}`:'';
   $('avbody').innerHTML=`<div class="okbox">📦 ${nuevo?'Pedido ubicado · avisar':'Aviso de pedido listo'}</div>
     <div class="small"><b>Cliente:</b> ${esc(p.cl)} | <b>Pedido N°:</b> ${esc(p.n)}${p.av?' | <b>Último aviso:</b> '+fh(p.av):''}</div>
-    <div class="celda" style="font-size:2.5rem;margin:8px 0">Celda: ${esc(p.c)}</div>
+    ${celdaBig(p,'Celda: ','font-size:2.5rem;margin:8px 0')}
     <div class="msgbox">${esc(msg)}</div>
     <a class="bl wa" href="${wl}" target="_blank" rel="noopener" onclick="marcarAvP('${k}')">📲 Enviar por WhatsApp${p.wa?' ('+esc(p.wa)+')':' (elegir contacto)'}</a>
     ${ml?`<a class="bl" href="${esc(ml)}" onclick="marcarAvP('${k}')">✉ Enviar por mail (${esc(p.em)})</a>`:''}
@@ -574,31 +596,36 @@ function detalle(){
   const celdasOpt=sel=>CELDAS.map(c=>`<option value="${c}" ${c===sel?'selected':''}>${c}${occ[c]?' ('+occ[c].length+')':''}</option>`).join('');
   let acc;
   if(p.e==='LISTO')acc=`<div class="row"><div><label>Cambiar destino</label><select onchange="cambiar('d',this.value)">${CONFIG.DESTINOS.map(x=>`<option ${x.k===p.d?'selected':''}>${x.k}</option>`).join('')}</select></div>
-  <div><label>Mover a celda</label><select onchange="cambiar('c',this.value)">${celdasOpt(p.c)}</select></div></div>
+  </div>
+  <label>Celdas y bultos</label>${cfHTML('ce',csOf(p))}
+  <div class="acts"><button onclick="guardarCeldas()">💾 Guardar celdas y bultos</button></div>
   <div class="acts">
     <button class="pri" onclick="retirar()">✔ Marcar RETIRADO</button>
     <button onclick="avisarPedidoListo('${selKey}')" style="background:#25d366;color:#04210f;border-color:#25d366">📲 ${p.av?'Reavisar':'Avisar'} pedido listo</button>
     <button onclick="reimprimir()">🖨 Etiqueta</button>
     <button onclick="sinUbicar('${selKey}')">↩ Devolver a sin ubicar</button>
-    <button onclick="addAqui('${esc(p.c)}')">➕ Otro pedido en ${esc(p.c)}</button>
+    <button onclick="addAqui('${esc(cellsOf(p)[0])}')">➕ Otro pedido en ${esc(cellsOf(p)[0])}</button>
     <button onclick="eliminarPedido('${selKey}')">🗑 Eliminar</button>
   </div>`;
   else if(p.e==='POR_UBICAR')acc=`<div class="small" style="margin:8px 0">Pedido facturado desde Roturas. Falta darle una celda del mueble.</div>
-  <label>Celda</label><select id="dsel">${celdasOpt(CELDAS.find(c=>!occ[c])||CELDAS[0])}</select>
-  <div class="acts"><button class="pri" onclick="ubicar('${selKey}','dsel')">📍 Ubicar y avisar</button><button onclick="eliminarPedido('${selKey}')">🗑 Eliminar</button></div>`;
+  <label>Celdas y bultos</label>${cfHTML('ud')}
+  <div class="acts"><button class="pri" onclick="ubicar('${selKey}','ud')">📍 Ubicar y avisar</button><button onclick="eliminarPedido('${selKey}')">🗑 Eliminar</button></div>`;
   else acc=`${p.fi?'<div><div class="small">Firma</div><img id="fimg" alt="firma" style="width:100%;max-width:260px;background:#fff;border:1px solid var(--br);border-radius:8px"></div>':''}
   <div class="acts"><button onclick="reabrir()">↩ Anular retiro</button><button onclick="eliminarPedido('${selKey}')">🗑 Eliminar pedido</button></div>`;
   d.innerHTML=`<h2>Pedido N° ${esc(p.n)} ${estTag(p)}</h2>
   <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div><b style="font-size:1.1rem">${esc(p.cl)}</b><div class="small">Código ${esc(p.co)||'—'}</div></div>${tag(p.d)}</div>
-  <div class="celda">${p.e==='LISTO'?esc(p.c):'—'}</div>
+  ${p.e==='LISTO'?celdaBig(p):'<div class="celda">—</div>'}
   <dl><dt>Ingreso</dt><dd>${fh(p.t)}</dd>${p.pr?`<dt>Producto</dt><dd>${esc(p.pr)}</dd>`:''}${p.av?`<dt>Avisado</dt><dd>${fh(p.av)}</dd>`:''}${p.f?`<dt>Retirado</dt><dd>${fh(p.f)}</dd>`:''}${p.rb?`<dt>Retiró</dt><dd>${esc(p.rb)}</dd>`:''}${p.o?`<dt>Obs.</dt><dd>${esc(p.o)}</dd>`:''}</dl>${acc}`;
   if(p.e==='RETIRADO'&&p.fi){const k=selKey;dbGet('firmas/'+k).then(f=>{const im=$('fimg');if(im&&selKey===k&&typeof f==='string'&&f.startsWith('data:image/png;base64,'))im.src=f}).catch(()=>{})}}
 async function sinUbicar(k){
   const p=P[k];if(!p||p.e!=='LISTO')return;
   if(!confirm(`¿Devolver el pedido N° ${p.n} (${p.cl}) a "sin ubicar"?\n\nSe libera la celda ${p.c} y después podés ubicarlo en otra.`))return;
-  try{const q={...p,e:'POR_UBICAR'};['c','tu','av'].forEach(x=>delete q[x]);
+  try{const q={...p,e:'POR_UBICAR'};['c','cs','bt','tu','av'].forEach(x=>delete q[x]);
     await dbSet('pedidos/'+k,q);P[k]=q;selKey=k;await refresh()}
   catch(e){alert('No se pudo devolver el pedido a sin ubicar.')}}
+async function guardarCeldas(){
+  const p=P[selKey];if(!p)return;const r=cfGet('ce');if(r.err){alert(r.err);return}
+  try{await dbSet('pedidos/'+selKey,{...p,c:r.c,cs:r.cs,bt:r.bt});await refresh()}catch(e){alert('No se pudo guardar el cambio.')}}
 async function cambiar(f,v){
   const p=P[selKey];if(!p||p[f]===v)return;
   try{await dbSet('pedidos/'+selKey,{...p,[f]:v});await refresh()}catch(e){alert('No se pudo guardar el cambio.')}}
@@ -628,17 +655,17 @@ async function eliminarPedido(k){
     if(selKey===k)selKey=null;delete P[k];await refresh();refreshR()
   }catch(e){alert('No se pudo eliminar.')}}
 async function guardar(imprimir){
-  const g=id=>$(id).value.trim(),n=g('ped'),cel=$('cel').value;
+  const g=id=>$(id).value.trim(),n=g('ped');
   if(!n||!g('cli')){$('err').textContent='Completá N° de pedido y cliente.';return}
-  if(!cel){$('err').textContent='Elegí una celda.';return}
+  const cf=cfGet('cf');if(cf.err){$('err').textContent=cf.err;return}
   $('err').textContent='';
   try{
     P=(await dbGet('pedidos'))||{};const k=pkey(n);
     if(P[k]&&P[k].e!=='RETIRADO'){$('err').textContent='Ya hay un pedido en espera con ese número.';render();return}
-    const p={n,cl:g('cli').toUpperCase(),co:g('cod'),d:destSel,c:cel,e:'LISTO',t:Date.now(),o:g('obs')};
+    const p={n,cl:g('cli').toUpperCase(),co:g('cod'),d:destSel,c:cf.c,cs:cf.cs,bt:cf.bt,e:'LISTO',t:Date.now(),o:g('obs')};
     await dbSet('pedidos/'+k,p);
-    $('res').classList.remove('hide');$('res').innerHTML=`<div style="text-align:center"><div class="small">COLOCAR EL PEDIDO EN LA CELDA</div><div class="celda">${esc(cel)}</div>${tag(p.d)}<div style="margin-top:6px"><b>${esc(p.cl)}</b> · N° ${esc(n)}</div></div>`;
-    ['ped','cod','cli','obs'].forEach(i=>$(i).value='');
+    $('res').classList.remove('hide');$('res').innerHTML=`<div style="text-align:center"><div class="small">COLOCAR EL PEDIDO EN ${cf.cs.length>1?'LAS CELDAS':'LA CELDA'}</div>${celdaBig(p)}${tag(p.d)}<div style="margin-top:6px"><b>${esc(p.cl)}</b> · N° ${esc(n)}</div></div>`;
+    ['ped','cod','cli','obs'].forEach(i=>$(i).value='');$('cfw').innerHTML='';
     selKey=k;await refresh();
     if(imprimir)etiqueta(p);else $('ped').focus()
   }catch(e){$('err').textContent='No se pudo guardar. Revisá la conexión.'}}
@@ -671,9 +698,9 @@ function cerrarCam(){scanning=false;if(stream)stream.getTracks().forEach(t=>t.st
 function qr(el,text,size){try{new QRCode(el,{text,width:256,height:256,correctLevel:QRCode.CorrectLevel.M})}catch(e){}}
 function etiqueta(p){
   $('lblArea').innerHTML=`<div class="lbl"><img class="lg" src="${CONFIG.LOGO}" alt="Holliday"><div class="t">${esc(p.d)}</div><div class="cl">${esc(p.cl)}</div>
-  <div class="mid"><div class="q"></div><div class="cel"><small>CELDA</small><b>${esc(p.c)}</b></div></div>
+  <div class="mid"><div class="q"></div><div class="cel"><small>${cellsOf(p).length>1?'CELDAS':'CELDA'}</small><b style="font-size:${cellsOf(p).length>2?'8mm':cellsOf(p).length>1?'11mm':'19mm'}">${esc(p.c)}</b>${bultosTot(p)?`<div class="bq">${cellsOf(p).length>1?csOf(p).map(x=>esc(x.c)+(x.b?': '+x.b:'')).join(' · ')+' · ':''}<span>${bultosTot(p)} BULTO${bultosTot(p)>1?'S':''}</span></div>`:''}</div></div>
   <div class="pn">PEDIDO N° ${esc(p.n)}</div><div class="s">${fh(p.t)} · ESCANEAR PARA VER UBICACIÓN</div></div>`;
-  qr($('lblArea').querySelector('.q'),base()+'#d='+b64e({n:p.n,cl:p.cl,d:p.d,c:p.c,t:p.t}));
+  qr($('lblArea').querySelector('.q'),base()+'#d='+b64e({n:p.n,cl:p.cl,d:p.d,c:p.c,cs:csOf(p),t:p.t}));
   showM('100mm 100mm')}
 function showM(size,link){
   $('pgstyle').textContent='@media print{@page{size:'+size+';margin:'+(size==='A4'?'10mm':'0')+'}}';
@@ -713,8 +740,8 @@ async function probar(){
   catch(e){alert('❌ No se pudo conectar. Revisá la dirección y que las reglas tengan .read y .write en true.')}}
 function csv(){
   const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
-  const rows=Object.values(P).sort((a,b)=>a.t-b.t).map(p=>[p.n,p.cl,p.co,p.d,p.c,p.e,fh(p.t),p.f?fh(p.f):'',p.rb||'',p.o].map(q).join(','));
-  const out=['Pedido,Cliente,Codigo,Destino,Celda,Estado,Ingreso,Retiro,Retiro por,Observaciones'].concat(rows).join('\n');
+  const rows=Object.values(P).sort((a,b)=>a.t-b.t).map(p=>[p.n,p.cl,p.co,p.d,p.c,bultosTot(p)||'',p.e,fh(p.t),p.f?fh(p.f):'',p.rb||'',p.o].map(q).join(','));
+  const out=['Pedido,Cliente,Codigo,Destino,Celda,Bultos,Estado,Ingreso,Retiro,Retiro por,Observaciones'].concat(rows).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+out],{type:'text/csv'}));
   a.download='pedidos-'+new Date().toISOString().slice(0,10)+'.csv';a.click()}
 async function seed(){
@@ -894,19 +921,17 @@ function formRotura(pf){
   <div class="row"><div><label>Motivo</label><select id="${pf}mo">${CONFIG.MOTIVOS.map(m=>`<option>${esc(m)}</option>`).join('')}</select></div>
   <div><label>Controló *</label><input id="${pf}k" autocomplete="off" maxlength="6" placeholder="Iniciales" value="${esc(ini)}" style="text-transform:uppercase"></div></div>
   <label>Fecha</label><input id="${pf}f" type="date" value="${hoyISO()}">
-  <label class="pk" style="margin-top:12px"><input type="checkbox" id="${pf}d" onchange="$('${pf}rw').classList.toggle('hide',!this.checked)"><div><b>🚚 Va a reparto (donación)</b><div class="small" style="font-weight:400">Tildá si esta rotura no es para nadie anotado.</div></div></label>
-  <div id="${pf}rw" class="hide"><label>N° de remito</label><input id="${pf}rm" autocomplete="off" inputmode="numeric" placeholder="Si todavía no lo tenés, dejalo vacío"></div>
   <div class="err" id="${pf}err"></div>
   <button class="pri full" onclick="guardarRotura('${pf}',this)">Registrar rotura</button>`}
 async function guardarRotura(pf,btn){
-  const g=id=>$(pf+id),prod=CONFIG.PRODUCTOS.find(p=>p.k===g('p').value),lo=g('l').value.trim(),n=parseInt(g('c').value)||0,ct=g('k').value.trim().toUpperCase(),f=g('f').value,don=g('d').checked,rem=g('rm').value.trim(),err=g('err');
+  const g=id=>$(pf+id),prod=CONFIG.PRODUCTOS.find(p=>p.k===g('p').value),lo=g('l').value.trim(),n=parseInt(g('c').value)||0,ct=g('k').value.trim().toUpperCase(),f=g('f').value,don=false,rem='',err=g('err');
   if(!prod||!lo||!ct||n<1||n>20||!f){err.textContent='Completá producto, lote, cantidad (1–20), controló y fecha.';return}
   err.textContent='';if(btn)btn.disabled=true;
   try{
     const t=new Date(f+'T12:00:00').getTime(),gid=uid('l'),tc=Date.now(),nuevas=[];
     try{localStorage.setItem('ctl_ini',ct)}catch(e){}
     for(let i=0;i<n;i++){const id=uid('r'),r={id,g:gid,tc,k:prod.k,cod:prod.c,d:prod.n,mo:g('mo').value,lo,ct,t,e:don?'DONACION':'DISPONIBLE'};if(don){r.rm=rem;r.td=tc}await dbSet('roturas/'+id,r);R[id]=r;nuevas.push(r)}
-    g('l').value='';g('c').value=1;g('d').checked=false;g('rw').classList.add('hide');g('rm').value='';
+    g('l').value='';g('c').value=1;
     const rr=$(pf==='x'?'rres':'dres');rr.classList.remove('hide');
     const head=`<div class="okbox">✔ ${n} ${plural(n,'bolsa registrada','bolsas registradas')}</div><div><b>${esc(prod.n)}</b> · lote ${esc(lo)}</div>`;
     if(don)rr.innerHTML=head+`<p class="small" style="margin:8px 0 0">Van a <b>reparto (donación)</b>${rem?' · remito '+esc(rem):' · todavía sin remito (se carga después desde Roturas)'}.</p>`;
