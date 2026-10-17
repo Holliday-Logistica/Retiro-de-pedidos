@@ -781,7 +781,7 @@ const waLink=(num,msg)=>(CONFIG.WHATSAPP==='app'?`https://wa.me/${num}?text=`:`h
 async function copiarMsg(txt,btn){try{await navigator.clipboard.writeText(txt);btn.textContent='✔ Mensaje copiado'}catch(e){const t=document.createElement('textarea');t.value=txt;document.body.appendChild(t);t.select();try{document.execCommand('copy');btn.textContent='✔ Mensaje copiado'}catch(x){btn.textContent='No se pudo copiar'}t.remove()}}
 const mailLink=(to,subj,body)=>{
   const q=`subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`,t=encodeURIComponent(to),m=CONFIG.CORREO||'outlook';
-  return m==='gmail'?`https://mail.google.com/mail/?view=cm&fs=1&to=${t}&${q}`
+  return m==='gmail'?`https://mail.google.com/mail/?view=cm&fs=1&to=${t}&su=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`
     :m==='outlook-personal'?`https://outlook.live.com/mail/0/deeplink/compose?to=${t}&${q}`
     :m==='predeterminado'?`mailto:${to}?${q}`
     :`https://outlook.office.com/mail/deeplink/compose?to=${t}&${q}`};
