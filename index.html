@@ -550,16 +550,14 @@ function ubicarCard(){
   const occ=occMap(),libres=CELDAS.filter(c=>!occ[c]);
   el.classList.remove('hide');
   el.innerHTML=`<h2>🧾 Facturados · por ubicar <span class="small">· ${L.length}</span></h2>
-  <p class="small" style="margin:-6px 0 10px">Vienen de Roturas con el remito ya cargado. Elegí la celda y tocá <b>Ubicar y avisar</b>.</p>`+
+  <p class="small" style="margin:-6px 0 10px">Vienen de Roturas con el remito ya cargado. Elegí la celda (o varias, si no entra todo en una) con sus bultos y tocá <b>Ubicar y avisar</b>.</p>`+
   L.map(([k,p])=>{
-    const cur=UCEL[k]&&CELDAS.includes(UCEL[k])?UCEL[k]:(libres[0]||CELDAS[0]);
-    return `<div class="sr" style="cursor:default;flex-wrap:wrap"><div style="flex:1;min-width:180px"><b>${esc(p.cl)}</b> <span class="small">Remito ${esc(p.n)}</span><div class="small">${esc(p.pr||p.o||'')}</div></div>
-    <div class="cellact"><select id="uc_${k}" onchange="UCEL['${k}']=this.value">${CELDAS.map(c=>`<option value="${c}" ${c===cur?'selected':''}>${c} · ${occ[c]?'ocupada ('+occ[c].length+')':'libre'}</option>`).join('')}</select>
-    <input id="ub_${k}" type="number" min="1" inputmode="numeric" placeholder="Bultos" style="width:84px"><button class="pri" onclick="ubicar('${k}')">📍 Ubicar y avisar</button><button onclick="pickPedido('${k}')">Ver</button></div></div>`}).join('')}
+    return `<div class="sr" style="cursor:default;flex-direction:column;align-items:stretch"><div><b>${esc(p.cl)}</b> <span class="small">Remito ${esc(p.n)}</span><div class="small">${esc(p.pr||p.o||'')}</div></div>
+    <label style="margin-top:6px">Celdas y bultos</label>${cfHTML('ul_'+k)}
+    <div class="acts" style="margin-top:8px"><button class="pri" onclick="ubicar('${k}','ul_${k}')">📍 Ubicar y avisar</button><button onclick="pickPedido('${k}')">Ver</button></div></div>`}).join('')}
 async function ubicar(k,selId){
-  const p=P[k];if(!p)return;let cs,c,bt;
-  if(selId==='ud'){const r=cfGet('ud');if(r.err){alert(r.err);return}cs=r.cs;c=r.c;bt=r.bt}
-  else{const sel=$('uc_'+k);if(!sel||!sel.value){alert('Elegí una celda.');return}const b=parseInt(($('ub_'+k)||{}).value)||0;cs=[b?{c:sel.value,b}:{c:sel.value}];c=sel.value;bt=b||''}
+  const p=P[k];if(!p)return;const r=cfGet(selId||'ul_'+k);if(r.err){alert(r.err);return}
+  const cs=r.cs,c=r.c,bt=r.bt;
   try{
     const p2={...p,c,cs,bt,e:'LISTO',tu:Date.now()};
     await dbSet('pedidos/'+k,p2);P[k]=p2;delete UCEL[k];selKey=k;
