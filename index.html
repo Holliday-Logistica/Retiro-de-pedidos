@@ -346,7 +346,7 @@ const LSK='retiro_db_v1';
 const lsRead=()=>{try{return JSON.parse(localStorage.getItem(LSK))||{}}catch(e){return{}}};
 const lsWrite=o=>{try{localStorage.setItem(LSK,JSON.stringify(o))}catch(e){}};
 async function dbGet(p){
-  if(FB){const r=await fetch(`${FB}/${p}.json`);if(!r.ok)throw new Error('db');return r.json()}
+  if(FB){const r=await fetch(`${FB}/${p}.json`);if(!r.ok)throw new Error('db'+r.status);return r.json()}
   let o=lsRead();for(const k of p.split('/')){o=o?o[k]:undefined}
   return o===undefined?null:o}
 async function dbSet(p,val){
@@ -447,6 +447,7 @@ function instructivoHTML(p){
     <li>Mirá abajo en qué <b>celda del mueble</b> está tu pedido (lugar de retiro: <b>${esc(CONFIG.LUGAR_RETIRO)}</b>).</li>
     <li><b>Retiralo</b> de esa celda. Llevate solo lo que figura a tu nombre.</li>
     <li>Tildá tu pedido, escribí tu <b>nombre y apellido</b>, <b>firmá con el dedo</b> y tocá <b>Confirmar retiro</b>.</li>
+    <li>Dejá firmada la copia <b>blanca (original)</b> del remito y llevate la copia de color <b>verde o amarilla</b>.</li>
   </ol></div>`}
 async function vistaRetiro(n){
   const pub=$('pub');pub.classList.remove('hide');
@@ -682,21 +683,21 @@ const reimprimir=()=>{if(P[selKey])etiqueta(P[selKey])};
 function cartel(){
   if(!FB){alert('El cartel de búsqueda por nombre necesita una base de datos compartida. Por ahora usá las etiquetas con QR de cada pedido, que funcionan solas.');return}
   $('lblArea').innerHTML=`<div class="lbl"><div class="hd"><img src="${CONFIG.LOGO}" alt="Holliday"><div class="tt">¿DÓNDE ESTÁ<br>MI PEDIDO?</div></div>
-  <div class="q" style="width:54mm;height:54mm"></div><div class="pn" style="font-size:5.5mm">ESCANEÁ, BUSCÁ TU NOMBRE<br>O CÓDIGO Y FIRMÁ EL RETIRO</div><div class="s">Retiro de pedidos · mostrador</div></div>`;
+  <div class="q" style="width:48mm;height:48mm"></div><div class="pn" style="font-size:4.4mm;line-height:1.2;padding:0 2mm">ESCANEÁ, BUSCÁ TU NOMBRE<br>O CÓDIGO Y FIRMÁ EL RETIRO</div><div class="s">Retiro de pedidos</div></div>`;
   qr($('lblArea').querySelector('.q'),base()+'#consulta');
   showM('100mm 100mm',base()+'#consulta')}
 function cartelI(){
   if(!FB){alert('El instructivo lleva QR que necesitan la base de datos compartida (FIREBASE_URL).');return}
-  $('lblArea').innerHTML=`<div class="ins"><div class="insh"><img src="${CONFIG.LOGO}" alt="Holliday"><div><h1>Retiro de pedidos</h1><div class="sub">Cómo retirar tu pedido · ${esc(CONFIG.LUGAR_RETIRO)}</div></div></div>
+  $('lblArea').innerHTML=`<div class="ins"><div class="insh"><img src="${CONFIG.LOGO}" alt="Holliday"><div><h1>Retiro de pedidos</h1><div class="sub">Cómo retirar tu pedido</div></div></div>
   <ol>
-    <li><b>Buscá tu celda.</b> Escaneá el QR "¿Dónde está mi pedido?", escribí tu nombre o código de cliente y mirá en qué celda del mueble está tu pedido. Si te avisamos por WhatsApp, abrí el link del mensaje.</li>
+    <li><b>Buscá tu celda.</b> Escaneá el QR "¿Dónde está mi pedido?", escribí tu nombre o código de cliente y mirá en qué celda del mueble está tu pedido. Si te avisamos por WhatsApp o por mail, abrí el link del mensaje y listo.</li>
     <li><b>Retirá tu pedido</b> de esa celda. Llevate solo lo que figura a tu nombre.</li>
     <li><b>Firmá el retiro.</b> En la misma pantalla tildá lo que te llevás, escribí tu nombre y apellido, firmá con el dedo y tocá <b>Confirmar retiro</b>.</li>
+    <li><b>Firmá la copia en papel.</b> También tenés que dejar firmada la copia <b>blanca (original)</b> del remito. Podés llevarte la copia de color <b>verde o amarilla</b>.</li>
   </ol>
-  <div class="qrs"><div><div class="q"></div><b>¿DÓNDE ESTÁ MI PEDIDO?</b><span>Buscá, retirá y firmá</span></div>
-  <div><div class="q"></div><b>BOLSAS ROTAS</b><span>Anotate para retirar · hasta ${LIM} por mes</span></div></div>
+  <div class="qrs"><div><div class="q"></div><b>¿DÓNDE ESTÁ MI PEDIDO?</b><span>Buscá, retirá y firmá</span></div></div>
   <div class="foot">Si algo no coincide o no encontrás tu pedido, consultá en logística.</div></div>`;
-  const q=$('lblArea').querySelectorAll('.q');qr(q[0],base()+'#consulta');qr(q[1],base()+'#roturas');
+  qr($('lblArea').querySelector('.q'),base()+'#consulta');
   showM('A4')}
 function cartelD(){
   if(!FB){alert('Necesita la base de datos compartida (FIREBASE_URL).');return}
@@ -1003,7 +1004,7 @@ function csvR(){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+out],{type:'text/csv'}));a.download='roturas-'+hoyISO()+'.csv';a.click()}
 function cartelR(){
   if(!FB){alert('El cartel necesita la base de datos compartida (FIREBASE_URL).');return}
-  $('lblArea').innerHTML=`<div class="lbl"><div class="hd"><img src="${CONFIG.LOGO}" alt="Holliday"><div class="tt">BOLSAS<br>ROTAS</div></div><div class="q" style="width:54mm;height:54mm"></div><div class="pn" style="font-size:5.5mm">ESCANEÁ Y ANOTATE<br>PARA RETIRAR</div><div class="s">Límite ${LIM} por mes · te avisamos cuando haya</div></div>`;
+  $('lblArea').innerHTML=`<div class="lbl"><div class="hd"><img src="${CONFIG.LOGO}" alt="Holliday"><div class="tt">BOLSAS<br>ROTAS</div></div><div class="q" style="width:54mm;height:54mm"></div><div class="pn" style="font-size:5.5mm">ESCANEÁ Y ANOTATE<br>PARA RETIRAR</div></div>`;
   qr($('lblArea').querySelector('.q'),base()+'#roturas');showM('100mm 100mm',base()+'#roturas')}
 
 /* ---- formulario de pedido ---- */
@@ -1062,7 +1063,7 @@ async function miCupo(){
     out.innerHTML=`<div class="stat" style="box-shadow:none;margin-bottom:10px"><b>${rest(u)}</b><span>${plural(rest(u),'bolsa disponible','bolsas disponibles')} este mes (usaste ${u} de ${LIM})</span></div>`+
       Object.entries(G).map(([k,L])=>{const w=L.filter(a=>a.e==='ESPERA').length,d=L.length-w;
         return `<div class="sr" style="cursor:default"><div><b>${esc(prodN(k))}</b><div class="small">${L.length} pedida${L.length>1?'s':''}</div></div><div style="text-align:right">${d?`<span class="est b">${d} LISTA${d>1?'S':''} PARA RETIRAR</span> `:''}${w?`<span class="est">${w} EN ESPERA</span>`:''}</div></div>`}).join('')
-  }catch(e){out.innerHTML='<div class="small">Sin conexión.</div>'}}
+  }catch(e){out.innerHTML=/db40[13]/.test(e.message)?'<div class="small">La base de datos no deja consultar este dato (reglas de Firebase). Avisá a logística.</div>':'<div class="small">No pudimos consultar. Revisá tu internet y probá de nuevo.</div>';console.error(e)}}
 
 /* ---- inicio corregido (garantiza la visibilidad de #panel) ---- */
 function iniciarPanel(){
