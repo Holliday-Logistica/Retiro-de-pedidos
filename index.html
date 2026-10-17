@@ -83,17 +83,16 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
 .lbl .cl{font-size:6mm;font-weight:800;line-height:1.1;max-height:13mm;overflow:hidden;width:100%}
 .lbl .mid{display:flex;gap:4mm;align-items:center;justify-content:center;width:100%}
 .lbl .q{width:42mm;height:42mm;flex:none}
-.lbl .q img,.lbl .q canvas{width:100%!important;height:100%!important;image-rendering:pixelated;display:block}
+.lbl .q img,.lbl .q canvas,.ins .q img,.ins .q canvas{width:100%!important;height:100%!important;image-rendering:pixelated;display:block}
 .lbl .cel{flex:1;min-width:0}.lbl .cel small{display:block;font-size:4mm;font-weight:700;letter-spacing:.2em}
 .lbl .cel b{font-size:19mm;line-height:1;font-weight:900}
 .lbl .pn{font-size:7mm;font-weight:900}
 .lbl .s{font-size:3mm;font-weight:700}
 @media print{
- @page{size:100mm 100mm;margin:0}
  html,body{background:#fff!important;margin:0;padding:0}
  .np{display:none!important}
  #lblmodal:not(.hide){position:static;background:none;padding:0;display:block!important}
- .lbl{border:0}
+ .lbl,.ins{border:0}
 }
 .bl{display:block;text-align:center;text-decoration:none;border-radius:10px;padding:11px 16px;font-weight:700;border:1px solid var(--br);background:var(--in);color:var(--tx);margin-top:8px}
 .bl.wa{background:#25d366;border-color:#25d366;color:#04210f}
@@ -107,7 +106,17 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
 .uchip.done{border-color:var(--mut);color:var(--mut)}
 .uchip button{padding:0 4px;border:0;background:none;font-size:.8rem;color:var(--bad)}
 .lin select,.lin input{padding:9px 8px}
+
+.steps{margin:8px 0 0;padding-left:20px;text-align:left}.steps li{margin:7px 0}
+.ins{width:190mm;max-width:100%;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;padding:8mm;border:1px solid #000;text-align:left}
+.ins h1{margin:0;font-size:11mm}.ins .sub{font-size:5.5mm;margin:2mm 0 6mm;font-weight:700;color:#444}
+.ins ol{font-size:5mm;line-height:1.35;padding-left:8mm;margin:0 0 8mm}.ins li{margin-bottom:4mm}
+.ins .qrs{display:flex;gap:10mm;justify-content:center;text-align:center}
+.ins .qrs>div{flex:1;display:flex;flex-direction:column;align-items:center;gap:2mm}
+.ins .q{width:60mm;height:60mm}.ins .qrs b{font-size:5.5mm}.ins .qrs span{font-size:4mm}
+.ins .foot{margin-top:8mm;font-size:4mm;text-align:center;color:#444}
 </style>
+<style id="pgstyle"></style>
 </head>
 <body>
 
@@ -192,6 +201,7 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
     <div class="acts" style="margin-top:14px">
       <button onclick="csv()">⬇ Exportar CSV</button>
       <button id="bcartel" onclick="cartel()">🖨 Cartel QR "¿Dónde está mi pedido?"</button>
+      <button id="bins" onclick="cartelI()">🖨 Instructivo para el mueble (A4)</button>
       <button id="bprobar" onclick="probar()">🔌 Probar conexión</button>
       <button id="seedb" class="hide" onclick="seed()">Cargar datos de ejemplo</button>
     </div>
@@ -209,19 +219,8 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
       <div>
         <div class="card">
           <h2>🐾 Registrar rotura en depósito</h2>
-          <label>Producto *</label><select id="rp"></select>
-          <div class="row">
-            <div><label>Lote *</label><input id="rl" autocomplete="off" inputmode="numeric"></div>
-            <div><label>Cantidad *</label><input id="rc" type="number" min="1" max="20" value="1"></div>
-          </div>
-          <div class="row">
-            <div><label>Motivo</label><select id="rmo"></select></div>
-            <div><label>Controló *</label><input id="rk" autocomplete="off" maxlength="6" placeholder="Iniciales" style="text-transform:uppercase"></div>
-          </div>
-          <label>Fecha</label><input id="rf" type="date">
-          <div class="err" id="rerr"></div>
-          <button class="pri full" onclick="guardarRotura()">Registrar rotura</button>
-          <p class="small">Cada bolsa queda como una unidad. Después la asignás a la primera persona anotada. Cuando la facturen, cargás el N° de remito y pasa a PEDIDOS para ubicarla en una celda y avisar.</p>
+          <div id="rform"></div>
+          <p class="small">Cada bolsa queda como una unidad. Después la asignás a la primera persona anotada. Cuando la facturen, cargás el N° de remito y pasa a PEDIDOS para ubicarla en una celda y avisar. Si no hay nadie anotado, la mandás a <b>reparto (donación)</b> con su remito.</p>
         </div>
         <div class="card hide" id="rres"></div>
         <div class="card"><h2>➕ Anotar un pedido (a pedido de la persona)</h2><div id="stform"></div></div>
@@ -244,6 +243,7 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
       <div class="acts" style="margin-top:14px">
         <button onclick="csvR()">⬇ Exportar CSV (formato planilla)</button>
         <button id="bcartelR" onclick="cartelR()">🖨 Cartel QR "Anotate a roturas"</button>
+        <button id="bcartelD" onclick="cartelD()">🖨 QR para depósito (uso interno)</button>
       </div>
     </div>
     <div class="card">
@@ -259,6 +259,7 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
 <!-- Etiqueta / cartel -->
 <div id="lblmodal" class="modal hide">
   <div id="lblArea"></div>
+  <div id="lnkcap" class="np small" style="color:#fff;word-break:break-all;max-width:440px;text-align:center"></div>
   <div class="acts np"><button class="pri" onclick="window.print()">🖨 Imprimir</button><button onclick="$('lblmodal').classList.add('hide')">Cerrar</button></div>
 </div>
 
@@ -274,6 +275,7 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
 const CONFIG={
   FIREBASE_URL:'https://retiro-de-pedidos-default-rtdb.firebaseio.com',   // misma base que el control de visitas (vacío = solo este equipo)
   PIN:'',            // PIN opcional para el mostrador
+  PIN_DEPOSITO:'',   // PIN opcional para la página del personal de depósito (#deposito)
   MUEBLE:[['A1','B1','C1','D1'],['A2','B2','C2','D2'],['AB3','CD3'],['AB4','CD4']],  // filas del mueble
   DESTINOS:[
     {k:'RETIRA',c:'#16a34a'},
@@ -366,7 +368,8 @@ function resCardPub(p){
   return `<div class="card body"><div class="small">TU PEDIDO ESTÁ EN LA CELDA</div><div class="celda">${esc(p.c)}</div>
   <div>${tag(p.d)}</div>${p.d==='RETIRA'?'<p style="margin:10px 0 0"><b>Retiralo por el mostrador</b></p>':''}
   <h3 style="margin:12px 0 0">${esc(p.cl)}</h3><div class="small">Pedido N° ${esc(p.n)}</div>
-  <div style="margin-top:14px">${planoHTML({},p.c,true)}</div></div>`}
+  <div style="margin-top:14px">${planoHTML({},p.c,true)}</div>
+  ${FB?'<a class="bl" style="background:var(--ac);border-color:var(--ac);color:#1b1300" href="#r='+encodeURIComponent(p.n)+'">✍ Completar retiro y firmar</a>':''}</div>`}
 async function vistaPedido(n){
   $('pub').classList.remove('hide');$('pub').innerHTML='<div class="card body">Buscando…</div>';
   try{const p=await dbGet('pedidos/'+pkey(n));
@@ -387,13 +390,13 @@ function consultar(q){clearTimeout(ct);ct=setTimeout(async()=>{
     $('pr').innerHTML=g.length?g.join(''):(Q.length>=3?'<div class="card body">No encontramos pedidos con ese dato. Consultá en el mostrador.</div>':'');
     g.forEach((_,i)=>{if($('sg'+i))initFirma('sg'+i)})
   }catch(e){$('pr').innerHTML='<div class="card body">Sin conexión.</div>'}},300)}
-function grupoHTML(i,lista){
+function grupoHTML(i,lista,pre){
   const nombre=lista[0][1].cl,act=lista.filter(([k,p])=>p.e==='LISTO').sort((a,b)=>a[1].t-b[1].t),ret=lista.filter(([k,p])=>p.e==='RETIRADO').length;
   if(!act.length)return `<div class="card body cg3"><h3 style="margin:0">${esc(nombre)}</h3><p>No tiene pedidos pendientes de retiro.</p><p class="small">${ret} pedido(s) ya retirado(s).</p></div>`;
   return `<div class="card cg3" id="g${i}"><h3 style="margin:0 0 4px">${esc(nombre)}</h3>
   <p class="small" style="margin:0 0 10px">${act.length} pedido(s) para retirar. Mirá en qué celda está cada uno:</p>
   ${planoHTML({},act.map(([k,p])=>p.c),true)}
-  <div style="margin-top:14px">${act.map(([k,p])=>`<label class="pk"><input type="checkbox" data-g="${i}" value="${k}"><b class="c">${esc(p.c)}</b><div><b>Pedido N° ${esc(p.n)}</b><div>${tag(p.d)}</div></div></label>`).join('')}</div>
+  <div style="margin-top:14px">${act.map(([k,p])=>`<label class="pk"><input type="checkbox" data-g="${i}" value="${k}" ${pre?'checked':''}><b class="c">${esc(p.c)}</b><div><b>Pedido N° ${esc(p.n)}</b>${p.pr?'<div class="small">'+esc(p.pr)+'</div>':''}<div>${tag(p.d)}</div></div></label>`).join('')}</div>
   <p class="small" style="margin:12px 0 4px"><b>Cuando lo retires,</b> tildá lo que te llevás y firmá:</p>
   <label>Nombre y apellido de quien retira</label><input id="rn${i}" autocomplete="off">
   <label>Firma</label><canvas id="sg${i}" class="firma"></canvas>
@@ -423,6 +426,27 @@ async function confirmar(i){
       <h3>${esc(nom)}</h3>${ok.map(p=>`<div>Pedido N° ${esc(p.n)} · celda ${esc(p.c)}</div>`).join('')}<p class="small">${fh(now)}</p></div>`
       :'<div class="body" style="text-align:center"><p>Esos pedidos ya habían sido retirados.</p></div>'
   }catch(e){msg.textContent='No se pudo registrar. Intentá de nuevo.';$('cb'+i).disabled=false}}
+
+/* ---- link del aviso: instructivo + firma del retiro ---- */
+function instructivoHTML(p){
+  return `<div class="card"><h2>📦 Tu pedido está listo para retirar</h2>
+  <div><b>Pedido N° ${esc(p.n)}</b>${p.pr?'<div>🐾 '+esc(p.pr)+'</div>':''}</div>
+  <ol class="steps">
+    <li>Mirá abajo en qué <b>celda del mueble</b> está tu pedido (lugar de retiro: <b>${esc(CONFIG.LUGAR_RETIRO)}</b>).</li>
+    <li><b>Retiralo</b> de esa celda. Llevate solo lo que figura a tu nombre.</li>
+    <li>Tildá tu pedido, escribí tu <b>nombre y apellido</b>, <b>firmá con el dedo</b> y tocá <b>Confirmar retiro</b>.</li>
+  </ol></div>`}
+async function vistaRetiro(n){
+  const pub=$('pub');pub.classList.remove('hide');
+  if(!FB){pub.innerHTML=AVISO_LOCAL;return}
+  pub.innerHTML='<div class="card body">Buscando…</div>';
+  try{
+    const k=pkey(n),p=await dbGet('pedidos/'+k);
+    if(!p){pub.innerHTML=`<div class="card body"><span class="est r">NO ENCONTRADO</span><p>No hay un pedido N° ${esc(n)}. Consultá en el mostrador.</p><a class="bl" href="#consulta">Buscar por nombre</a></div>`;return}
+    if(p.e!=='LISTO'){pub.innerHTML=resCardPub(p);return}
+    pub.innerHTML=instructivoHTML(p)+grupoHTML(0,[[k,p]],true);
+    initFirma('sg0')
+  }catch(e){pub.innerHTML='<div class="card body"><span class="tag" style="background:var(--bad)">Sin conexión</span><p class="small">Revisá tu internet e intentá de nuevo.</p></div>'}}
 
 /* El QR de la etiqueta lleva los datos adentro: funciona en cualquier celular sin base de datos */
 async function vistaSnapshot(txt){
@@ -504,7 +528,8 @@ async function ubicar(k,selId){
 /* ---- Aviso de pedido listo (WhatsApp / mail) con la celda ---- */
 function avisarPedidoListo(k,nuevo){
   const p=P[k];if(!p||p.e!=='LISTO')return;
-  const msg=`Hola ${prim(p.cl)}! 👋 Tu pedido N° ${p.n} ya está listo para retirar.${p.pr?'\n\n🐾 '+p.pr:''}\n\n📍 Celda del mueble: *${p.c}*\n🏢 Lugar: ${CONFIG.LUGAR_RETIRO}\n\nMostrá este mensaje o tu número de pedido al retirar.\n\n${CONFIG.FIRMA_MSG}`;
+  const lk=base()+'#r='+encodeURIComponent(p.n);
+  const msg=`Hola ${prim(p.cl)}! 👋 Tu pedido N° ${p.n} ya está listo para retirar.${p.pr?'\n\n🐾 '+p.pr:''}\n\n✍️ Para retirarlo, ingresá a este link (ahí ves dónde está y firmás al llevártelo):\n${lk}\n\n${CONFIG.FIRMA_MSG}`;
   const waNum=p.wa&&dig(p.wa).length>=10?CONFIG.PREFIJO_WA+dig(p.wa).slice(-10):'';
   const wl=`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`;
   const ml=p.em?`mailto:${p.em}?subject=${encodeURIComponent('Tu pedido está listo para retirar')}&body=${encodeURIComponent(msg)}`:'';
@@ -636,6 +661,10 @@ function etiqueta(p){
   <div class="mid"><div class="q"></div><div class="cel"><small>CELDA</small><b>${esc(p.c)}</b></div></div>
   <div class="pn">PEDIDO N° ${esc(p.n)}</div><div class="s">${fh(p.t)} · ESCANEAR PARA VER UBICACIÓN</div></div>`;
   qr($('lblArea').querySelector('.q'),base()+'#d='+b64e({n:p.n,cl:p.cl,d:p.d,c:p.c,t:p.t}));
+  showM('100mm 100mm')}
+function showM(size,link){
+  $('pgstyle').textContent='@media print{@page{size:'+size+';margin:'+(size==='A4'?'10mm':'0')+'}}';
+  $('lnkcap').textContent=link||'';
   $('lblmodal').classList.remove('hide')}
 const reimprimir=()=>{if(P[selKey])etiqueta(P[selKey])};
 function cartel(){
@@ -643,7 +672,25 @@ function cartel(){
   $('lblArea').innerHTML=`<div class="lbl"><div class="t">¿DÓNDE ESTÁ MI PEDIDO?</div>
   <div class="q" style="width:60mm;height:60mm"></div><div class="pn" style="font-size:5.5mm">ESCANEÁ, BUSCÁ TU NOMBRE<br>O CÓDIGO Y FIRMÁ EL RETIRO</div><div class="s">Retiro de pedidos · mostrador</div></div>`;
   qr($('lblArea').querySelector('.q'),base()+'#consulta');
-  $('lblmodal').classList.remove('hide')}
+  showM('100mm 100mm',base()+'#consulta')}
+function cartelI(){
+  if(!FB){alert('El instructivo lleva QR que necesitan la base de datos compartida (FIREBASE_URL).');return}
+  $('lblArea').innerHTML=`<div class="ins"><h1>📦 Retiro de pedidos</h1><div class="sub">Cómo retirar tu pedido · ${esc(CONFIG.LUGAR_RETIRO)}</div>
+  <ol>
+    <li><b>Buscá tu celda.</b> Escaneá el QR "¿Dónde está mi pedido?", escribí tu nombre o código de cliente y mirá en qué celda del mueble está tu pedido. Si te avisamos por WhatsApp, abrí el link del mensaje.</li>
+    <li><b>Retirá tu pedido</b> de esa celda. Llevate solo lo que figura a tu nombre.</li>
+    <li><b>Firmá el retiro.</b> En la misma pantalla tildá lo que te llevás, escribí tu nombre y apellido, firmá con el dedo y tocá <b>Confirmar retiro</b>.</li>
+  </ol>
+  <div class="qrs"><div><div class="q"></div><b>¿DÓNDE ESTÁ MI PEDIDO?</b><span>Buscá, retirá y firmá</span></div>
+  <div><div class="q"></div><b>BOLSAS ROTAS</b><span>Anotate para retirar · hasta ${LIM} por mes</span></div></div>
+  <div class="foot">Si algo no coincide o no encontrás tu pedido, consultá en logística.</div></div>`;
+  const q=$('lblArea').querySelectorAll('.q');qr(q[0],base()+'#consulta');qr(q[1],base()+'#roturas');
+  showM('A4')}
+function cartelD(){
+  if(!FB){alert('Necesita la base de datos compartida (FIREBASE_URL).');return}
+  const u=base()+'#deposito';
+  $('lblArea').innerHTML=`<div class="lbl"><div class="t">DEPÓSITO · ROTURAS</div><div class="q" style="width:60mm;height:60mm"></div><div class="pn" style="font-size:5.5mm">ESCANEÁ Y CARGÁ<br>LA BOLSA ROTA</div><div class="s">Uso interno del personal de depósito</div></div>`;
+  qr($('lblArea').querySelector('.q'),u);showM('100mm 100mm',u)}
 
 /* ---- utilidades ---- */
 async function probar(){
@@ -683,9 +730,7 @@ const toggleDone=()=>{showDone=!showDone;if($('wdone'))$('wdone').classList.togg
 const usadas=(pk,mes)=>Object.values(R).filter(r=>r.pk===pk&&r.m===mes&&(r.e==='ASIGNADA'||r.e==='RETIRADA'||r.e==='FACTURADA')).length;
 
 function initR(){
-  if($('rp'))$('rp').innerHTML=prodOpts(false);
-  if($('rmo'))$('rmo').innerHTML=CONFIG.MOTIVOS.map(m=>`<option>${esc(m)}</option>`).join('');
-  if($('rf'))$('rf').value=hoyISO();
+  if($('rform'))$('rform').innerHTML=formRotura('x');
   if($('mesl'))$('mesl').textContent='· '+mesKey();
   if($('bcartelR'))$('bcartelR').classList.toggle('hide',!FB);
   if($('stform'))$('stform').innerHTML=formAnotar('s','Anotar pedido');
@@ -710,7 +755,7 @@ async function refreshR(soft){
 function cola(r){
   const mes=mesKey();
   return Object.values(A).filter(a=>a.e==='ESPERA'&&(a.pr==='*'||a.pr===r.k)&&usadas(a.pk,mes)<LIM).sort((a,b)=>a.t-b.t)}
-const estR=r=>r.e==='DISPONIBLE'?'<span class="est">SIN ASIGNAR</span>':r.e==='ASIGNADA'?'<span class="est b">PENDIENTE DE REMITO</span>':r.e==='FACTURADA'?'<span class="est b" style="background:#7c3aed">EN PEDIDOS</span>':'<span class="est r">RETIRADA</span>';
+const estR=r=>r.e==='DISPONIBLE'?'<span class="est">SIN ASIGNAR</span>':r.e==='ASIGNADA'?'<span class="est b">PENDIENTE DE REMITO</span>':r.e==='FACTURADA'?'<span class="est b" style="background:#7c3aed">EN PEDIDOS</span>':r.e==='DONACION'?'<span class="est" style="background:#0d9488;color:#fff">REPARTO</span>':'<span class="est r">RETIRADA</span>';
 
 function renderR(){
   if(!$('tabR'))return;
@@ -735,11 +780,11 @@ function renderR(){
     return `<div style="margin-bottom:10px"><b>${esc(p.n)}</b> ${d?`<span class="est">${d} sin asignar</span>`:''}<ol class="small" style="margin:4px 0 0 18px;padding:0">${q.map(x=>`<li>${esc(x.nm)}${x.pr==='*'?' (cualquiera)':''}${usadas(x.pk,mes)>=LIM?' · <span style="color:var(--bad)">sin cupo este mes</span>':''}</li>`).join('')}</ol></div>`}).join('')||'<div class="small">Sin pedidos en espera.</div>';
 
   const cnt=e=>rs.filter(r=>!e||r.e===e).length;
-  if($('rchips'))$('rchips').innerHTML=[['DISPONIBLE','SIN ASIGNAR','#f59e0b'],['ASIGNADA','PENDIENTE DE REMITO','#2563eb'],['FACTURADA','EN PEDIDOS','#7c3aed'],['RETIRADA','RETIRADAS','#6b7280'],['','TODAS','#1d3557']]
+  if($('rchips'))$('rchips').innerHTML=[['DISPONIBLE','SIN ASIGNAR','#f59e0b'],['ASIGNADA','PENDIENTE DE REMITO','#2563eb'],['FACTURADA','EN PEDIDOS','#7c3aed'],['RETIRADA','RETIRADAS','#6b7280'],['DONACION','A REPARTO','#0d9488'],['','TODAS','#1d3557']]
     .map(([e,t,c])=>`<button class="chip ${fRot===e?'on':''}" style="--c:${c}" onclick="setFR('${e}')">${t} (${cnt(e)})</button>`).join('');
   const l=rs.filter(r=>!fRot||r.e===fRot).sort((a,b)=>fRot==='DISPONIBLE'?a.t-b.t:(b.ta||b.t)-(a.ta||a.t)).slice(0,200);
   if($('rlist'))$('rlist').innerHTML=l.length?l.map(r=>`<tr><td>${fd(r.t)}</td><td>${esc(r.d)}<div class="small">${r.cod?esc(r.cod)+' · ':''}${esc(r.mo)} · ctl ${esc(r.ct)}</div></td><td>${esc(r.lo)}</td><td>${estR(r)}</td>
-    <td>${r.nm?`<b>${esc(r.nm)}</b><div class="small">${usadas(r.pk,r.m)}/${LIM} en ${esc(r.m)}${r.rm?' · remito '+esc(r.rm):''}${r.f?' · retiró '+(r.rb?esc(r.rb)+' el ':'')+fd(r.f):''}</div>`:'—'}</td>
+    <td>${r.e==='DONACION'?`<b>Reparto (donación)</b><div class="small">${r.rm?'remito '+esc(r.rm):'sin remito'}</div>`:r.nm?`<b>${esc(r.nm)}</b><div class="small">${usadas(r.pk,r.m)}/${LIM} en ${esc(r.m)}${r.rm?' · remito '+esc(r.rm):''}${r.f?' · retiró '+(r.rb?esc(r.rb)+' el ':'')+fd(r.f):''}</div>`:'—'}</td>
     <td>${accionR(r,mes)}</td></tr>`).join('')
     :'<tr><td colspan="6" class="small" style="text-align:center;padding:20px">Sin roturas para mostrar.</td></tr>';
 
@@ -789,13 +834,33 @@ async function anularRetiroR(rid){
     await refresh();await refreshR()
   }catch(e){alert('No se pudo anular el retiro.')}}
 
+/* ---- REPARTO (donación): rotura que no es para nadie anotado ---- */
+async function aReparto(rid){
+  const r=R[rid];if(!r||r.e!=='DISPONIBLE')return;
+  const rem=prompt('Va a REPARTO (donación)\n'+r.d+' · lote '+r.lo+'\n\nN° de remito:','');
+  if(rem===null)return;
+  if(!rem.trim()){alert('Ingresá el número de remito.');return}
+  try{const r2={...r,e:'DONACION',rm:rem.trim(),td:Date.now()};await dbSet('roturas/'+rid,r2);R[rid]=r2;renderR()}
+  catch(e){alert('No se pudo guardar.')}}
+async function remitoDon(rid){
+  const r=R[rid];if(!r||r.e!=='DONACION')return;
+  const rem=prompt('N° de remito del reparto:\n'+r.d+' · lote '+r.lo,r.rm||'');
+  if(rem===null)return;
+  if(!rem.trim()){alert('Ingresá el número de remito.');return}
+  try{const r2={...r,rm:rem.trim()};await dbSet('roturas/'+rid,r2);R[rid]=r2;renderR()}
+  catch(e){alert('No se pudo guardar.')}}
+async function quitarReparto(rid){
+  const r=R[rid];if(!r||r.e!=='DONACION'||!confirm('¿Quitar esta bolsa de reparto? Vuelve a estar sin asignar.'))return;
+  try{const r2={...r,e:'DISPONIBLE'};delete r2.rm;delete r2.td;await dbSet('roturas/'+rid,r2);R[rid]=r2;renderR()}
+  catch(e){alert('No se pudo guardar.')}}
+
 function accionR(r,mes){
   if(r.e==='DISPONIBLE'){
     const c=cola(r);
-    if(!c.length)return `<div class="cellact"><span class="small">Sin anotados para este producto</span><button onclick="borrarR('${r.id}')" title="Eliminar">🗑</button></div>`;
+    if(!c.length)return `<div class="cellact"><span class="small">Sin anotados para este producto</span><button class="pri" onclick="aReparto('${r.id}')">🚚 A reparto (donación)</button><button onclick="borrarR('${r.id}')" title="Eliminar">🗑</button></div>`;
     return `<div class="cellact"><button class="pri" onclick="asignar('${r.id}','${c[0].id}')">Asignar a ${esc(c[0].nm.split(' ')[0])}</button>
     ${c.length>1?`<select onchange="if(this.value)asignar('${r.id}',this.value)"><option value="">Otro…</option>${c.map(a=>`<option value="${a.id}">${esc(a.nm)} (${usadas(a.pk,mes)}/${LIM})</option>`).join('')}</select>`:''}
-    <button onclick="borrarR('${r.id}')" title="Eliminar">🗑</button></div>`}
+    <button onclick="aReparto('${r.id}')" title="Mandar a reparto (donación)">🚚 Reparto</button><button onclick="borrarR('${r.id}')" title="Eliminar">🗑</button></div>`}
   if(r.e==='ASIGNADA')return `<div class="cellact">
     <button class="pri" onclick="facturarRotura('${r.id}')">📄 Cargar remito</button>
     <button onclick="avisar('${r.id}')">📲 ${r.av?'Reavisar':'Avisar'} asignación</button>
@@ -804,22 +869,68 @@ function accionR(r,mes){
   if(r.e==='FACTURADA'){const p=P[r.pd];
     const st=p?(p.e==='POR_UBICAR'?'Falta ubicar en una celda':p.e==='LISTO'?'En celda '+esc(p.c)+(p.av?' · avisado':' · sin avisar'):''):'En Pedidos';
     return `<div class="cellact"><span class="small">${st}</span><button onclick="irPedido('${r.pd}')">👁 Ver en Pedidos</button><button onclick="anularRemito('${r.id}')">↩ Anular remito</button></div>`}
+  if(r.e==='DONACION')return `<div class="cellact"><button onclick="remitoDon('${r.id}')">✏ ${r.rm?'Cambiar':'Cargar'} remito</button><button onclick="quitarReparto('${r.id}')">↩ Quitar de reparto</button></div>`;
   if(r.e==='RETIRADA')return `<div class="cellact"><button onclick="anularRetiroR('${r.id}')">↩ Anular retiro</button></div>`;
   return '<span class="small">—</span>'}
 
-async function guardarRotura(){
-  const prod=CONFIG.PRODUCTOS.find(p=>p.k===$('rp').value),lo=$('rl').value.trim(),n=parseInt($('rc').value)||0,ct=$('rk').value.trim().toUpperCase(),f=$('rf').value;
-  if(!prod||!lo||!ct||n<1||n>20||!f){$('rerr').textContent='Completá producto, lote, cantidad (1–20), controló y fecha.';return}
-  $('rerr').textContent='';
+function formRotura(pf){
+  let ini='';try{ini=localStorage.getItem('ctl_ini')||''}catch(e){}
+  return `<label>Producto *</label><select id="${pf}p">${prodOpts(false)}</select>
+  <div class="row"><div><label>Lote *</label><input id="${pf}l" autocomplete="off" inputmode="numeric"></div>
+  <div><label>Cantidad *</label><input id="${pf}c" type="number" min="1" max="20" value="1"></div></div>
+  <div class="row"><div><label>Motivo</label><select id="${pf}mo">${CONFIG.MOTIVOS.map(m=>`<option>${esc(m)}</option>`).join('')}</select></div>
+  <div><label>Controló *</label><input id="${pf}k" autocomplete="off" maxlength="6" placeholder="Iniciales" value="${esc(ini)}" style="text-transform:uppercase"></div></div>
+  <label>Fecha</label><input id="${pf}f" type="date" value="${hoyISO()}">
+  <label class="pk" style="margin-top:12px"><input type="checkbox" id="${pf}d" onchange="$('${pf}rw').classList.toggle('hide',!this.checked)"><div><b>🚚 Va a reparto (donación)</b><div class="small" style="font-weight:400">Tildá si esta rotura no es para nadie anotado.</div></div></label>
+  <div id="${pf}rw" class="hide"><label>N° de remito</label><input id="${pf}rm" autocomplete="off" inputmode="numeric" placeholder="Si todavía no lo tenés, dejalo vacío"></div>
+  <div class="err" id="${pf}err"></div>
+  <button class="pri full" onclick="guardarRotura('${pf}',this)">Registrar rotura</button>`}
+async function guardarRotura(pf,btn){
+  const g=id=>$(pf+id),prod=CONFIG.PRODUCTOS.find(p=>p.k===g('p').value),lo=g('l').value.trim(),n=parseInt(g('c').value)||0,ct=g('k').value.trim().toUpperCase(),f=g('f').value,don=g('d').checked,rem=g('rm').value.trim(),err=g('err');
+  if(!prod||!lo||!ct||n<1||n>20||!f){err.textContent='Completá producto, lote, cantidad (1–20), controló y fecha.';return}
+  err.textContent='';if(btn)btn.disabled=true;
   try{
-    const t=new Date(f+'T12:00:00').getTime(),nuevas=[];
-    for(let i=0;i<n;i++){const id=uid('r'),r={id,k:prod.k,cod:prod.c,d:prod.n,mo:$('rmo').value,lo,ct,t,e:'DISPONIBLE'};await dbSet('roturas/'+id,r);R[id]=r;nuevas.push(r)}
-    $('rl').value='';$('rc').value=1;fRot='DISPONIBLE';
-    const c=cola(nuevas[0]);
-    $('rres').classList.remove('hide');$('rres').innerHTML=`<div class="okbox">✔ ${n} ${plural(n,'bolsa registrada','bolsas registradas')}</div><div><b>${esc(prod.n)}</b> · lote ${esc(lo)}</div>
-      <p class="small" style="margin:8px 0 0">${c.length?`Hay ${c.length} ${plural(c.length,'persona anotada','personas anotadas')} con cupo. Primera en la fila: <b>${esc(c[0].nm)}</b>. Asignala desde la tabla de abajo.`:'Todavía no hay nadie anotado con cupo para este producto; la bolsa queda sin asignar.'}</p>`;
-    await refreshR()
-  }catch(e){$('rerr').textContent='No se pudo guardar. Revisá la conexión.'}}
+    const t=new Date(f+'T12:00:00').getTime(),gid=uid('l'),tc=Date.now(),nuevas=[];
+    try{localStorage.setItem('ctl_ini',ct)}catch(e){}
+    for(let i=0;i<n;i++){const id=uid('r'),r={id,g:gid,tc,k:prod.k,cod:prod.c,d:prod.n,mo:g('mo').value,lo,ct,t,e:don?'DONACION':'DISPONIBLE'};if(don){r.rm=rem;r.td=tc}await dbSet('roturas/'+id,r);R[id]=r;nuevas.push(r)}
+    g('l').value='';g('c').value=1;g('d').checked=false;g('rw').classList.add('hide');g('rm').value='';
+    const rr=$(pf==='x'?'rres':'dres');rr.classList.remove('hide');
+    const head=`<div class="okbox">✔ ${n} ${plural(n,'bolsa registrada','bolsas registradas')}</div><div><b>${esc(prod.n)}</b> · lote ${esc(lo)}</div>`;
+    if(don)rr.innerHTML=head+`<p class="small" style="margin:8px 0 0">Van a <b>reparto (donación)</b>${rem?' · remito '+esc(rem):' · todavía sin remito (se carga después desde Roturas)'}.</p>`;
+    else if(pf==='x'){const c=cola(nuevas[0]);
+      rr.innerHTML=head+`<p class="small" style="margin:8px 0 0">${c.length?`Hay ${c.length} ${plural(c.length,'persona anotada','personas anotadas')} con cupo. Primera en la fila: <b>${esc(c[0].nm)}</b>. Asignala desde la tabla de abajo.`:'Todavía no hay nadie anotado con cupo para este producto; la bolsa queda sin asignar (o la mandás a reparto).'}</p>`}
+    else rr.innerHTML=head+'<p class="small" style="margin:8px 0 0">Logística se encarga de asignarla.</p>';
+    if(pf==='x'){fRot=don?'DONACION':'DISPONIBLE';await refreshR()}else recientesD();
+  }catch(e){err.textContent='No se pudo guardar. Revisá la conexión.'}
+  if(btn)btn.disabled=false}
+
+/* ---- página del personal de depósito (#deposito) ---- */
+function vistaDeposito(){
+  const pub=$('pub');pub.classList.remove('hide');
+  if(!FB){pub.innerHTML=AVISO_LOCAL;return}
+  let ok=!CONFIG.PIN_DEPOSITO;try{ok=ok||sessionStorage.getItem('pind')==='1'}catch(e){}
+  if(!ok){pub.innerHTML='<div class="card"><h2>Depósito · acceso</h2><input id="dpin" type="password" placeholder="PIN" inputmode="numeric"><button class="pri full" onclick="pinD()">Entrar</button><div class="err" id="dperr"></div></div>';return}
+  pub.innerHTML=`<div class="card"><h2>🐾 Cargar bolsa rota</h2><p class="small" style="margin:0">Cada bolsa rota es una unidad. Completá los datos y registrá; logística se encarga de asignarla.</p><div id="dform"></div></div>
+  <div class="card hide" id="dres"></div>
+  <div class="card"><h2>Últimas cargadas</h2><div id="drec"></div></div>`;
+  $('dform').innerHTML=formRotura('d');recientesD()}
+function pinD(){if($('dpin').value===CONFIG.PIN_DEPOSITO){try{sessionStorage.setItem('pind','1')}catch(e){}vistaDeposito()}else $('dperr').textContent='PIN incorrecto'}
+async function recientesD(){
+  const el=$('drec');if(!el)return;
+  try{
+    const G={};Object.values((await dbGet('roturas'))||{}).filter(r=>r.tc&&r.g).forEach(r=>{(G[r.g]=G[r.g]||[]).push(r)});
+    const L=Object.values(G).sort((a,b)=>b[0].tc-a[0].tc).slice(0,6);
+    el.innerHTML=L.length?L.map(g=>{const r=g[0],libre=g.every(x=>x.e==='DISPONIBLE'||x.e==='DONACION');
+      return `<div class="sr" style="cursor:default"><div><b>${g.length} × ${esc(shortN(r.k))}</b><div class="small">lote ${esc(r.lo)} · ${fd(r.t)} · ${esc(r.ct)}${r.e==='DONACION'?' · 🚚 reparto':''}</div></div>${libre?`<button onclick="deshacerD('${esc(r.g)}')">✕ Deshacer</button>`:'<span class="small">en proceso</span>'}</div>`}).join(''):'<div class="small">Todavía no hay nada cargado.</div>'
+  }catch(e){el.innerHTML='<div class="small">Sin conexión.</div>'}}
+async function deshacerD(gid){
+  if(!confirm('¿Deshacer esta carga? Se borran esas bolsas.'))return;
+  try{
+    const L=Object.values((await dbGet('roturas'))||{}).filter(r=>r.g===gid);
+    if(L.some(r=>r.e!=='DISPONIBLE'&&r.e!=='DONACION')){alert('Esas bolsas ya están en proceso. Avisá a logística.');return}
+    for(const r of L)await dbSet('roturas/'+r.id,null);
+    recientesD()
+  }catch(e){alert('No se pudo deshacer.')}}
 
 async function syncCupo(pk,mes){try{await dbSet(`cupo/${pk}/${mes}`,usadas(pk,mes))}catch(e){console.warn('syncCupo',e)}}
 
@@ -875,13 +986,13 @@ async function cancelarAnot(aid){const a=A[aid];if(!a||!confirm('¿Quitar a '+a.
 
 function csvR(){
   const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
-  const rows=Object.values(R).sort((a,b)=>a.t-b.t).map(r=>[r.cod,r.d,r.mo,r.lo,1,r.ct,fd(r.t),r.e==='RETIRADA'?'OK':'',r.rm||'',r.nm||'',r.m||''].map(q).join(','));
+  const rows=Object.values(R).sort((a,b)=>a.t-b.t).map(r=>[r.cod,r.d,r.mo,r.lo,1,r.ct,fd(r.t),r.e==='RETIRADA'?'OK':'',r.rm||'',r.nm||(r.e==='DONACION'?'REPARTO (DONACIÓN)':''),r.m||''].map(q).join(','));
   const out=['CODIGO,DESCRIPCION,MOTIVO,LOTE,CANTIDAD,CONTROLO,FECHA,OK,REMITO PARA,PERSONA,MES'].concat(rows).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+out],{type:'text/csv'}));a.download='roturas-'+hoyISO()+'.csv';a.click()}
 function cartelR(){
   if(!FB){alert('El cartel necesita la base de datos compartida (FIREBASE_URL).');return}
   $('lblArea').innerHTML=`<div class="lbl"><div class="t">BOLSAS ROTAS</div><div class="q" style="width:60mm;height:60mm"></div><div class="pn" style="font-size:5.5mm">ESCANEÁ Y ANOTATE<br>PARA RETIRAR</div><div class="s">Límite ${LIM} por mes · te avisamos cuando haya</div></div>`;
-  qr($('lblArea').querySelector('.q'),base()+'#roturas');$('lblmodal').classList.remove('hide')}
+  qr($('lblArea').querySelector('.q'),base()+'#roturas');showM('100mm 100mm',base()+'#roturas')}
 
 /* ---- formulario de pedido ---- */
 const linHTML=()=>`<div class="lin" style="display:grid;grid-template-columns:1fr 64px 36px;gap:6px;margin-top:6px"><select class="lp">${prodOpts(true)}</select><input class="lq" type="number" min="1" max="${MAXQ}" value="1" title="Cantidad"><button type="button" style="padding:0" onclick="this.parentNode.remove()">✕</button></div>`;
@@ -946,6 +1057,8 @@ function iniciarPanel(){
   if($('panel'))$('panel').classList.remove('hide');
   if($('bcartel'))$('bcartel').classList.toggle('hide',!FB);
   if($('bprobar'))$('bprobar').classList.toggle('hide',!FB);
+  if($('bins'))$('bins').classList.toggle('hide',!FB);
+  if($('bcartelD'))$('bcartelD').classList.toggle('hide',!FB);
   initR();
   refresh();
   refreshR();
@@ -963,6 +1076,9 @@ addEventListener('hashchange',()=>location.reload());
   const h=location.hash,m=h.match(/^#p=(.+)$/),dd=h.match(/^#d=(.+)$/);
   if(dd){$('modo').textContent='Consulta de pedido';vistaSnapshot(dd[1]);return}
   if(m){$('modo').textContent='Consulta de pedido';vistaPedido(decodeURIComponent(m[1]));return}
+  const rr=h.match(/^#r=(.+)$/);
+  if(rr){$('modo').textContent='Retiro de pedido';vistaRetiro(decodeURIComponent(rr[1]));return}
+  if(h==='#deposito'){$('modo').textContent='Depósito · cargar roturas';vistaDeposito();return}
   if(h==='#roturas'){$('modo').textContent='Bolsas rotas · anotate para retirar';vistaRoturas();return}
   if(h==='#consulta'){$('modo').textContent='Consulta de pedidos';vistaConsulta();return}
   
