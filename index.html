@@ -180,6 +180,10 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
         <div class="row">
           <div><label>Observaciones</label><input id="obs" autocomplete="off"></div>
         </div>
+        <div class="row">
+          <div><label>Mail del cliente (para avisarle)</label><input id="pem" type="email" inputmode="email" autocomplete="off" placeholder="cliente@empresa.com"></div>
+          <div><label>WhatsApp (opcional)</label><input id="pwa" type="tel" inputmode="tel" autocomplete="off" placeholder="11 5555 5555"></div>
+        </div>
         <label>Celda del mueble y cantidad de bultos</label><div id="cfw"></div>
         <div class="err" id="err"></div>
         <div class="acts"><button onclick="guardar(false)">Guardar</button><button class="pri" onclick="guardar(true)">Guardar e imprimir etiqueta</button></div>
@@ -561,10 +565,19 @@ async function ubicar(k,selId){
   }catch(e){alert('No se pudo ubicar el pedido. Revisá la conexión.')}}
 
 /* ---- Aviso de pedido listo (WhatsApp / mail) con la celda ---- */
+function msgListo(p){
+  const lk=base()+'#r='+encodeURIComponent(p.n);
+  return `Hola ${prim(p.cl)}! 👋 Tu pedido N° ${p.n} ya está listo para retirar.${p.pr?'\n\n🐾 '+p.pr:''}${bultosTot(p)?'\n📦 '+bTxt(bultosTot(p)):''}\n\n✍️ Para retirarlo, ingresá a este link (ahí ves dónde está y firmás al llevártelo):\n${lk}\n\n${CONFIG.FIRMA_MSG}`}
+async function avMail(k){
+  const p=P[k],e=($('avem')||{}).value||'';if(!p)return;
+  if(!/^\S+@\S+\.\S+$/.test(e.trim())){$('avst').textContent='Escribí un mail válido.';return}
+  const p2={...p,em:e.trim()};P[k]=p2;try{await dbSet('pedidos/'+k,p2)}catch(x){}
+  marcarAvP(k);
+  location.href=`mailto:${p2.em}?subject=${encodeURIComponent('Tu pedido está listo para retirar')}&body=${encodeURIComponent(msgListo(p2))}`}
 function avisarPedidoListo(k,nuevo){
   const p=P[k];if(!p||p.e!=='LISTO')return;
   const lk=base()+'#r='+encodeURIComponent(p.n);
-  const msg=`Hola ${prim(p.cl)}! 👋 Tu pedido N° ${p.n} ya está listo para retirar.${p.pr?'\n\n🐾 '+p.pr:''}${bultosTot(p)?'\n📦 '+bTxt(bultosTot(p)):''}\n\n✍️ Para retirarlo, ingresá a este link (ahí ves dónde está y firmás al llevártelo):\n${lk}\n\n${CONFIG.FIRMA_MSG}`;
+  const msg=msgListo(p);
   const waNum=p.wa&&dig(p.wa).length>=10?CONFIG.PREFIJO_WA+dig(p.wa).slice(-10):'';
   const wl=`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`;
   const ml=p.em?`mailto:${p.em}?subject=${encodeURIComponent('Tu pedido está listo para retirar')}&body=${encodeURIComponent(msg)}`:'';
@@ -573,7 +586,7 @@ function avisarPedidoListo(k,nuevo){
     ${celdaBig(p,'Celda: ','font-size:2.5rem;margin:8px 0')}
     <div class="msgbox">${esc(msg)}</div>
     <a class="bl wa" href="${wl}" target="_blank" rel="noopener" onclick="marcarAvP('${k}')">📲 Enviar por WhatsApp${p.wa?' ('+esc(p.wa)+')':' (elegir contacto)'}</a>
-    ${ml?`<a class="bl" href="${esc(ml)}" onclick="marcarAvP('${k}')">✉ Enviar por mail (${esc(p.em)})</a>`:''}
+    ${ml?`<a class="bl" href="${esc(ml)}" onclick="marcarAvP('${k}')">✉ Enviar por mail (${esc(p.em)})</a>`:`<div class="row" style="grid-template-columns:1fr auto;margin-top:8px"><input id="avem" type="email" inputmode="email" placeholder="Mail del cliente"><button onclick="avMail('${k}')">✉ Enviar por mail</button></div>`}
     <div id="avst" class="small" style="margin-top:8px"></div>
     <button class="full" onclick="$('avmodal').classList.add('hide');etiqueta(P['${k}'])">🖨 Imprimir etiqueta</button>
     <button class="full" onclick="$('avmodal').classList.add('hide')">Cerrar</button>`;
@@ -597,6 +610,8 @@ function detalle(){
   let acc;
   if(p.e==='LISTO')acc=`<div class="row"><div><label>Cambiar destino</label><select onchange="cambiar('d',this.value)">${CONFIG.DESTINOS.map(x=>`<option ${x.k===p.d?'selected':''}>${x.k}</option>`).join('')}</select></div>
   </div>
+  <div class="row"><div><label>Mail del cliente</label><input id="dem" type="email" inputmode="email" value="${esc(p.em||'')}" placeholder="cliente@empresa.com"></div><div><label>WhatsApp</label><input id="dwa" type="tel" inputmode="tel" value="${esc(p.wa||'')}" placeholder="11 5555 5555"></div></div>
+  <div class="acts"><button onclick="guardarContacto()">💾 Guardar contacto</button></div>
   <label>Celdas y bultos</label>${cfHTML('ce',csOf(p))}
   <div class="acts"><button onclick="guardarCeldas()">💾 Guardar celdas y bultos</button></div>
   <div class="acts">
@@ -623,6 +638,10 @@ async function sinUbicar(k){
   try{const q={...p,e:'POR_UBICAR'};['c','cs','bt','tu','av'].forEach(x=>delete q[x]);
     await dbSet('pedidos/'+k,q);P[k]=q;selKey=k;await refresh()}
   catch(e){alert('No se pudo devolver el pedido a sin ubicar.')}}
+async function guardarContacto(){
+  const p=P[selKey];if(!p)return;const em=$('dem').value.trim(),wa=$('dwa').value.trim();
+  if(em&&!/^\S+@\S+\.\S+$/.test(em)){alert('El mail no parece válido.');return}
+  try{await dbSet('pedidos/'+selKey,{...p,em,wa});await refresh()}catch(e){alert('No se pudo guardar.')}}
 async function guardarCeldas(){
   const p=P[selKey];if(!p)return;const r=cfGet('ce');if(r.err){alert(r.err);return}
   try{await dbSet('pedidos/'+selKey,{...p,c:r.c,cs:r.cs,bt:r.bt});await refresh()}catch(e){alert('No se pudo guardar el cambio.')}}
@@ -658,14 +677,15 @@ async function guardar(imprimir){
   const g=id=>$(id).value.trim(),n=g('ped');
   if(!n||!g('cli')){$('err').textContent='Completá N° de pedido y cliente.';return}
   const cf=cfGet('cf');if(cf.err){$('err').textContent=cf.err;return}
+  if(g('pem')&&!/^\S+@\S+\.\S+$/.test(g('pem'))){$('err').textContent='El mail no parece válido. Revisalo o dejalo vacío.';return}
   $('err').textContent='';
   try{
     P=(await dbGet('pedidos'))||{};const k=pkey(n);
     if(P[k]&&P[k].e!=='RETIRADO'){$('err').textContent='Ya hay un pedido en espera con ese número.';render();return}
-    const p={n,cl:g('cli').toUpperCase(),co:g('cod'),d:destSel,c:cf.c,cs:cf.cs,bt:cf.bt,e:'LISTO',t:Date.now(),o:g('obs')};
+    const p={n,cl:g('cli').toUpperCase(),co:g('cod'),d:destSel,c:cf.c,cs:cf.cs,bt:cf.bt,e:'LISTO',t:Date.now(),o:g('obs'),em:g('pem'),wa:g('pwa')};
     await dbSet('pedidos/'+k,p);
     $('res').classList.remove('hide');$('res').innerHTML=`<div style="text-align:center"><div class="small">COLOCAR EL PEDIDO EN ${cf.cs.length>1?'LAS CELDAS':'LA CELDA'}</div>${celdaBig(p)}${tag(p.d)}<div style="margin-top:6px"><b>${esc(p.cl)}</b> · N° ${esc(n)}</div></div>`;
-    ['ped','cod','cli','obs'].forEach(i=>$(i).value='');$('cfw').innerHTML='';
+    ['ped','cod','cli','obs','pem','pwa'].forEach(i=>$(i).value='');$('cfw').innerHTML='';
     selKey=k;await refresh();
     if(imprimir)etiqueta(p);else $('ped').focus()
   }catch(e){$('err').textContent='No se pudo guardar. Revisá la conexión.'}}
