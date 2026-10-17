@@ -302,7 +302,9 @@ const CONFIG={
   LIMITE_MES:2,                      // bolsas por persona por mes
   PREFIJO_WA:'549',                  // Argentina: 549 + área + número (sin 0 ni 15)
   LUGAR_RETIRO:'el mostrador',       // texto que va en el aviso
-  FIRMA_MSG:'Retiro de roturas · Logística',
+  WHATSAPP:'web',                    // 'web' = WhatsApp Web en el navegador (respeta bien los emojis) · 'app' = la aplicación de WhatsApp de la PC
+  CORREO:'gmail',                    // desde dónde se manda el mail: 'outlook' (Outlook web de la empresa) · 'outlook-personal' (outlook.com / hotmail) · 'gmail' · 'predeterminado' (el programa de correo de la PC)
+  FIRMA_MSG:'',
   MOTIVOS:['Roturas en deposito','Roturas en pallets cerrado','Descarte (R)','Roturas bolsa despegada'],
   /* COMPLETAR los códigos que faltan */
   PRODUCTOS:[
@@ -567,26 +569,27 @@ async function ubicar(k,selId){
 /* ---- Aviso de pedido listo (WhatsApp / mail) con la celda ---- */
 function msgListo(p){
   const lk=base()+'#r='+encodeURIComponent(p.n);
-  return `Hola ${prim(p.cl)}! 👋 Tu pedido N° ${p.n} ya está listo para retirar.${p.pr?'\n\n🐾 '+p.pr:''}${bultosTot(p)?'\n📦 '+bTxt(bultosTot(p)):''}\n\n✍️ Para retirarlo, ingresá a este link (ahí ves dónde está y firmás al llevártelo):\n${lk}\n\n${CONFIG.FIRMA_MSG}`}
+  return `Hola ${prim(p.cl)}! 👋 Tu pedido N° ${p.n} ya está listo para retirar.${p.pr?'\n\n🐾 '+p.pr:''}${bultosTot(p)?'\n📦 '+bTxt(bultosTot(p)):''}\n\n✍️ Para retirarlo, ingresá a este link (ahí ves dónde está y firmás al llevártelo):\n${lk}`}
 async function avMail(k){
   const p=P[k],e=($('avem')||{}).value||'';if(!p)return;
   if(!/^\S+@\S+\.\S+$/.test(e.trim())){$('avst').textContent='Escribí un mail válido.';return}
   const p2={...p,em:e.trim()};P[k]=p2;try{await dbSet('pedidos/'+k,p2)}catch(x){}
   marcarAvP(k);
-  location.href=`mailto:${p2.em}?subject=${encodeURIComponent('Tu pedido está listo para retirar')}&body=${encodeURIComponent(msgListo(p2))}`}
+  {const u=mailLink(p2.em,'Tu pedido está listo para retirar',msgListo(p2));if(CONFIG.CORREO==='predeterminado')location.href=u;else window.open(u,'_blank')}}
 function avisarPedidoListo(k,nuevo){
   const p=P[k];if(!p||p.e!=='LISTO')return;
   const lk=base()+'#r='+encodeURIComponent(p.n);
   const msg=msgListo(p);
   const waNum=p.wa&&dig(p.wa).length>=10?CONFIG.PREFIJO_WA+dig(p.wa).slice(-10):'';
-  const wl=`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`;
-  const ml=p.em?`mailto:${p.em}?subject=${encodeURIComponent('Tu pedido está listo para retirar')}&body=${encodeURIComponent(msg)}`:'';
+  const wl=waLink(waNum,msg);
+  const ml=p.em?mailLink(p.em,'Tu pedido está listo para retirar',msg):'';
   $('avbody').innerHTML=`<div class="okbox">📦 ${nuevo?'Pedido ubicado · avisar':'Aviso de pedido listo'}</div>
     <div class="small"><b>Cliente:</b> ${esc(p.cl)} | <b>Pedido N°:</b> ${esc(p.n)}${p.av?' | <b>Último aviso:</b> '+fh(p.av):''}</div>
     ${celdaBig(p,'Celda: ','font-size:2.5rem;margin:8px 0')}
     <div class="msgbox">${esc(msg)}</div>
     <a class="bl wa" href="${wl}" target="_blank" rel="noopener" onclick="marcarAvP('${k}')">📲 Enviar por WhatsApp${p.wa?' ('+esc(p.wa)+')':' (elegir contacto)'}</a>
-    ${ml?`<a class="bl" href="${esc(ml)}" onclick="marcarAvP('${k}')">✉ Enviar por mail (${esc(p.em)})</a>`:`<div class="row" style="grid-template-columns:1fr auto;margin-top:8px"><input id="avem" type="email" inputmode="email" placeholder="Mail del cliente"><button onclick="avMail('${k}')">✉ Enviar por mail</button></div>`}
+    ${ml?`<a class="bl" href="${esc(ml)}"${mailAttr()} onclick="marcarAvP('${k}')">✉ Enviar por mail (${esc(p.em)})</a>`:`<div class="row" style="grid-template-columns:1fr auto;margin-top:8px"><input id="avem" type="email" inputmode="email" placeholder="Mail del cliente"><button onclick="avMail('${k}')">✉ Enviar por mail</button></div>`}
+    <button class="full" onclick="copiarMsg(P['${k}']?msgListo(P['${k}']):'',this)">📋 Copiar mensaje</button>
     <div id="avst" class="small" style="margin-top:8px"></div>
     <button class="full" onclick="$('avmodal').classList.add('hide');etiqueta(P['${k}'])">🖨 Imprimir etiqueta</button>
     <button class="full" onclick="$('avmodal').classList.add('hide')">Cerrar</button>`;
@@ -774,6 +777,15 @@ const LIM=CONFIG.LIMITE_MES;
 const fd=t=>{const d=new Date(t);return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()};
 const mesKey=t=>{const d=new Date(t||Date.now());return d.getFullYear()+'-'+pad(d.getMonth()+1)};
 const hoyISO=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+const waLink=(num,msg)=>(CONFIG.WHATSAPP==='app'?`https://wa.me/${num}?text=`:`https://web.whatsapp.com/send?${num?'phone='+num+'&':''}text=`)+encodeURIComponent(msg);
+async function copiarMsg(txt,btn){try{await navigator.clipboard.writeText(txt);btn.textContent='✔ Mensaje copiado'}catch(e){const t=document.createElement('textarea');t.value=txt;document.body.appendChild(t);t.select();try{document.execCommand('copy');btn.textContent='✔ Mensaje copiado'}catch(x){btn.textContent='No se pudo copiar'}t.remove()}}
+const mailLink=(to,subj,body)=>{
+  const q=`subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`,t=encodeURIComponent(to),m=CONFIG.CORREO||'outlook';
+  return m==='gmail'?`https://mail.google.com/mail/?view=cm&fs=1&to=${t}&${q}`
+    :m==='outlook-personal'?`https://outlook.live.com/mail/0/deeplink/compose?to=${t}&${q}`
+    :m==='predeterminado'?`mailto:${to}?${q}`
+    :`https://outlook.office.com/mail/deeplink/compose?to=${t}&${q}`};
+const mailAttr=()=>(CONFIG.CORREO==='predeterminado'?'':' target="_blank" rel="noopener"');
 const dig=s=>String(s||'').replace(/\D/g,'');
 const pkOf=wa=>{const d=dig(wa);return d.length>=10?'u'+d.slice(-10):''};
 const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
@@ -1008,7 +1020,7 @@ async function asignar(rid,aid){
 
 function mensaje(r){
   const u=usadas(r.pk,r.m),q=rest(u);
-  return `Hola ${prim(r.nm)}! 👋 Te asignamos tu bolsa: ${r.d} (lote ${r.lo}). Estamos gestionando la facturación; apenas esté lista te avisamos en qué celda del mueble la podés retirar por ${CONFIG.LUGAR_RETIRO}.\n\nCon esta bolsa llevás ${u} de ${LIM} del mes. ${q?`Te ${plural(q,'queda','quedan')} ${q} ${plural(q,'bolsa disponible','bolsas disponibles')} para este mes.`:'Es la última que podés retirar este mes.'}\n\n${CONFIG.FIRMA_MSG}`}
+  return `Hola ${prim(r.nm)}! 👋 Te asignamos tu bolsa: ${r.d} (lote ${r.lo}). Estamos gestionando la facturación; apenas esté lista te avisamos en qué celda del mueble la podés retirar por ${CONFIG.LUGAR_RETIRO}.\n\nCon esta bolsa llevás ${u} de ${LIM} del mes. ${q?`Te ${plural(q,'queda','quedan')} ${q} ${plural(q,'bolsa disponible','bolsas disponibles')} para este mes.`:'Es la última que podés retirar este mes.'}`}
 const EJS=()=>CONFIG.EMAILJS&&CONFIG.EMAILJS.service&&CONFIG.EMAILJS.template&&CONFIG.EMAILJS.key;
 async function enviarMailJS(r,msg,subj){
   const E=CONFIG.EMAILJS,x=await fetch('https://api.emailjs.com/api/v1.0/email/send',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -1017,12 +1029,13 @@ async function enviarMailJS(r,msg,subj){
 async function marcarAv(rid){const r=R[rid];if(!r)return;const r2={...r,av:Date.now()};R[rid]=r2;try{await dbSet('roturas/'+rid,r2)}catch(e){}renderR()}
 function avisar(rid){
   const r=R[rid];if(!r)return;
-  const msg=mensaje(r),wl=`https://wa.me/${CONFIG.PREFIJO_WA}${dig(r.wa).slice(-10)}?text=${encodeURIComponent(msg)}`,
-    ml=r.em?`mailto:${r.em}?subject=${encodeURIComponent('Te asignamos tu bolsa: '+r.d)}&body=${encodeURIComponent(msg)}`:'';
+  const msg=mensaje(r),wl=waLink(CONFIG.PREFIJO_WA+dig(r.wa).slice(-10),msg),
+    ml=r.em?mailLink(r.em,'Te asignamos tu bolsa: '+r.d,msg):'';
   $('avbody').innerHTML=`<div class="okbox">Aviso de asignación a ${esc(r.nm)}</div>
     <div class="small">${esc(r.d)} · lote ${esc(r.lo)}</div><div class="msgbox">${esc(msg)}</div>
     <a class="bl wa" href="${wl}" target="_blank" rel="noopener" onclick="marcarAv('${rid}')">📲 Enviar por WhatsApp (${esc(r.wa)})</a>
-    ${ml?`<a class="bl" href="${esc(ml)}" onclick="marcarAv('${rid}')">✉ Enviar por mail (${esc(r.em)})</a>`:'<div class="small" style="margin-top:8px">Esta persona no dejó mail.</div>'}
+    ${ml?`<a class="bl" href="${esc(ml)}"${mailAttr()} onclick="marcarAv('${rid}')">✉ Enviar por mail (${esc(r.em)})</a>`:'<div class="small" style="margin-top:8px">Esta persona no dejó mail.</div>'}
+    <button class="full" onclick="copiarMsg(mensaje(R['${rid}']),this)">📋 Copiar mensaje</button>
     <button class="full" onclick="$('avmodal').classList.add('hide')">Cerrar</button>`;
   $('avmodal').classList.remove('hide')}
 
