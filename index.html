@@ -475,7 +475,7 @@ function instructivoHTML(p){
     <li>Mirá abajo en qué <b>celda del mueble</b> está tu pedido (lugar de retiro: <b>${esc(CONFIG.LUGAR_RETIRO)}</b>).</li>
     <li><b>Retiralo</b> de esa celda. Llevate solo lo que figura a tu nombre.</li>
     <li>Tildá tu pedido, escribí tu <b>nombre y apellido</b>, <b>firmá con el dedo</b> y tocá <b>Confirmar retiro</b>.</li>
-    <li>Dejá firmada la copia <b>blanca (original)</b> del remito y llevate la copia de color <b>verde o amarilla</b>.</li>
+    <li>Dejá firmada la copia <b>blanca</b> (original) del remito y llevate la copia de color: <b>verde</b> si es de <b>Béccar</b>, <b>amarilla</b> si es de <b>Zárate</b>.</li>
   </ol></div>`}
 async function vistaRetiro(n){
   const pub=$('pub');pub.classList.remove('hide');
@@ -575,14 +575,14 @@ async function avMail(k){
   if(!/^\S+@\S+\.\S+$/.test(e.trim())){$('avst').textContent='Escribí un mail válido.';return}
   const p2={...p,em:e.trim()};P[k]=p2;try{await dbSet('pedidos/'+k,p2)}catch(x){}
   marcarAvP(k);
-  {const u=mailLink(p2.em,'Tu pedido está listo para retirar',msgListo(p2));if(CONFIG.CORREO==='predeterminado')location.href=u;else window.open(u,'_blank')}}
+  {const u=mailLink(p2.em,'Retiro de pedidos · Pedido N° '+p2.n+' listo para retirar',msgListo(p2));if(CONFIG.CORREO==='predeterminado')location.href=u;else window.open(u,'_blank')}}
 function avisarPedidoListo(k,nuevo){
   const p=P[k];if(!p||p.e!=='LISTO')return;
   const lk=base()+'#r='+encodeURIComponent(p.n);
   const msg=msgListo(p);
   const waNum=p.wa&&dig(p.wa).length>=10?CONFIG.PREFIJO_WA+dig(p.wa).slice(-10):'';
   const wl=waLink(waNum,msg);
-  const ml=p.em?mailLink(p.em,'Tu pedido está listo para retirar',msg):'';
+  const ml=p.em?mailLink(p.em,'Retiro de pedidos · Pedido N° '+p.n+' listo para retirar',msg):'';
   $('avbody').innerHTML=`<div class="okbox">📦 ${nuevo?'Pedido ubicado · avisar':'Aviso de pedido listo'}</div>
     <div class="small"><b>Cliente:</b> ${esc(p.cl)} | <b>Pedido N°:</b> ${esc(p.n)}${p.av?' | <b>Último aviso:</b> '+fh(p.av):''}</div>
     ${celdaBig(p,'Celda: ','font-size:2.5rem;margin:8px 0')}
@@ -743,7 +743,7 @@ function cartelI(){
     <li><b>Buscá tu celda.</b> Escaneá el QR "¿Dónde está mi pedido?", escribí tu nombre o código de cliente y mirá en qué celda del mueble está tu pedido. Si te avisamos por WhatsApp o por mail, abrí el link del mensaje y listo.</li>
     <li><b>Retirá tu pedido</b> de esa celda. Llevate solo lo que figura a tu nombre.</li>
     <li><b>Firmá el retiro.</b> En la misma pantalla tildá lo que te llevás, escribí tu nombre y apellido, firmá con el dedo y tocá <b>Confirmar retiro</b>.</li>
-    <li><b>Firmá la copia en papel.</b> También tenés que dejar firmada la copia <b>blanca (original)</b> del remito. Podés llevarte la copia de color <b>verde o amarilla</b>.</li>
+    <li><b>Firmá el remito en papel.</b> Dejá firmada la copia <b>blanca</b> (original) y llevate la copia de color: <b>verde</b> si tu pedido es de <b>Béccar</b>, <b>amarilla</b> si es de <b>Zárate</b>.</li>
   </ol>
   <div class="qrs"><div><div class="q"></div><b>¿DÓNDE ESTÁ MI PEDIDO?</b><span>Buscá, retirá y firmá</span></div></div>
   <div class="foot">Si algo no coincide o no encontrás tu pedido, consultá en logística.</div></div>`;
