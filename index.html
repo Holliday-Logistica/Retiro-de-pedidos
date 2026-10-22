@@ -326,23 +326,23 @@ const CONFIG={
   MOTIVOS:['Roturas en deposito','Roturas en pallets cerrado','Descarte (R)','Roturas bolsa despegada','Vale devolución'],
   /* COMPLETAR los códigos que faltan */
   PRODUCTOS:[
-    {k:'articular2',n:'MV ARTICULAR X 2 KG',c:''},
-    {k:'articular10',n:'MV ARTICULAR x 10 Kg',c:'30-0001-1-AR'},
-    {k:'cardiaco2',n:'MV CARDIACO x 2 Kg',c:''},
-    {k:'cardiaco10',n:'MV CARDIACO x 10 Kg',c:''},
-    {k:'gatosgastro2',n:'MV GATOS GASTROINTESTINAL X 2 KG',c:''},
-    {k:'gatosobeso2',n:'MV GATOS OBESIDAD X 2 KG',c:''},
-    {k:'gatosrenal2',n:'MV GATOS RENAL X 2 KG',c:''},
-    {k:'gatosurinario2',n:'MV GATOS URINARIO x 2 Kg',c:''},
-    {k:'gatosurinario75',n:'MV GATOS URINARIO x 7.5 Kg',c:'30-0005-1-AR'},
-    {k:'perrosgastro2',n:'MV PERROS GASTROINTESTINAL x 2 Kg',c:''},
+    {k:'articular2',n:'MV PERROS ARTICULAR x 2 Kg',c:'30-0001-0-AR'},
+    {k:'articular10',n:'MV PERROS ARTICULAR x 10 Kg',c:'30-0001-1-AR'},
+    {k:'cardiaco2',n:'MV PERROS CARDIO x 2 Kg',c:'30-0002-0-AR'},
+    {k:'cardiaco10',n:'MV PERROS CARDIO x 10 Kg',c:'30-0002-1-AR'},
+    {k:'perrosgastro2',n:'MV PERROS GASTROINTESTINAL x 2 Kg',c:'30-0003-0-AR'},
     {k:'perrosgastro10',n:'MV PERROS GASTROINTESTINAL x 10 Kg',c:'30-0003-1-AR'},
-    {k:'perrosobeso2',n:'MV PERROS OBESIDAD x 2 Kg',c:''},
-    {k:'perrosobeso10',n:'MV PERROS OBESIDAD x 10 Kg',c:''},
-    {k:'renal2',n:'MV RENAL x 2 Kg',c:'30-0004-0-AR'},
-    {k:'renal10',n:'MV RENAL x 10 Kg',c:''},
-    {k:'sensibilidad2',n:'MV SENSIBILIDAD DIETARIA X 2 KG',c:''},
-    {k:'sensibilidad10',n:'MV SENSIBILIDAD DIETARIA x 10 Kg',c:''}
+    {k:'gatosgastro2',n:'MV GATOS GASTROINTESTINAL x 2 Kg',c:'30-0003-2-AR'},
+    {k:'renal2',n:'MV PERROS RENAL x 2 Kg',c:'30-0004-0-AR'},
+    {k:'renal10',n:'MV PERROS RENAL x 10 Kg',c:'30-0004-1-AR'},
+    {k:'gatosurinario75',n:'MV GATOS URINARIO x 7.5 Kg',c:'30-0005-1-AR'},
+    {k:'gatosurinario2',n:'MV GATOS URINARIO x 2 Kg',c:'30-0005-2-AR'},
+    {k:'gatosobeso2',n:'MV GATOS OBESIDAD x 2 Kg',c:'30-0006-2-AR'},
+    {k:'sensibilidad2',n:'MV SENSIBILIDAD DIETARIA x 2 Kg',c:'30-0007-0-AR'},
+    {k:'sensibilidad10',n:'MV SENSIBILIDAD DIETARIA x 10 Kg',c:'30-0007-1-AR'},
+    {k:'gatosrenal2',n:'MV GATOS RENAL x 2 Kg',c:'30-0008-1-AR'},
+    {k:'perrosobeso10',n:'MV PERROS OBESIDAD x 10 Kg',c:'30-0009-0-AR'},
+    {k:'perrosobeso2',n:'MV PERROS OBESIDAD x 2 Kg',c:'30-0009-1-AR'}
   ],
   /* Opcional: envío AUTOMÁTICO de mails con EmailJS (emailjs.com). Vacío = se abre el mail/WhatsApp con el texto ya escrito */
   /* ---- MAIL DE ROTURAS (botón "Armar mail de roturas") ---- */
@@ -891,7 +891,7 @@ function renderR(){
   if($('rchips'))$('rchips').innerHTML=[['DISPONIBLE','SIN ASIGNAR','#e2211c'],['ASIGNADA','PENDIENTE DE REMITO','#2563eb'],['FACTURADA','EN PEDIDOS','#7c3aed'],['RETIRADA','RETIRADAS','#6b7280'],['DONACION','A REPARTO','#0d9488'],['DESCARTE','DESCARTE','#57534e'],['','TODAS','#182b3e']]
     .map(([e,t,c])=>`<button class="chip ${fRot===e?'on':''}" style="--c:${c}" onclick="setFR('${e}')">${t} (${cnt(e)})</button>`).join('');
   const l=rs.filter(r=>!fRot||r.e===fRot).sort((a,b)=>fRot==='DISPONIBLE'?a.t-b.t:(b.ta||b.t)-(a.ta||a.t)).slice(0,200);
-  if($('rlist'))$('rlist').innerHTML=l.length?l.map(r=>`<tr class="${rSel[r.id]?'rs':''}"><td>${okSel(r)?`<input type="checkbox" class="rchk" ${rSel[r.id]?'checked':''} onchange="rTog('${r.id}',this.checked)">`:''}</td><td>${fd(r.t)}</td><td>${esc(r.d)}<div class="small">${r.cod?esc(r.cod)+' · ':''}${esc(r.mo)}${r.ob?' · <b>'+esc(r.ob)+'</b>':''} · ctl ${esc(r.ct)}</div></td><td>${esc(r.lo)}</td><td>${estR(r)}${r.ml?'<div class="small">✉ informada '+fd(r.ml)+(r.dm?' · '+dmTxt(r.dm):'')+'</div>':''}</td>
+  if($('rlist'))$('rlist').innerHTML=l.length?l.map(r=>`<tr class="${rSel[r.id]?'rs':''}"><td>${okSel(r)?`<input type="checkbox" class="rchk" ${rSel[r.id]?'checked':''} onchange="rTog('${r.id}',this.checked)">`:''}</td><td>${fd(r.t)}</td><td>${esc(r.d)}<div class="small">${codOf(r)?esc(codOf(r))+' · ':''}${esc(r.mo)}${r.ob?' · <b>'+esc(r.ob)+'</b>':''} · ctl ${esc(r.ct)}</div></td><td>${esc(r.lo)}</td><td>${estR(r)}${r.ml?'<div class="small">✉ informada '+fd(r.ml)+(r.dm?' · '+dmTxt(r.dm):'')+'</div>':''}</td>
     <td>${r.e==='DESCARTE'?'<b>Descarte</b><div class="small">no va a reparto ni a retirar</div>':r.e==='DONACION'?`<b>Reparto (donación)</b><div class="small">${r.rm?'remito '+esc(r.rm):'sin remito'}</div>`:r.nm?`<b>${esc(r.nm)}</b><div class="small">${usadas(r.pk,r.m)}/${LIM} en ${esc(r.m)}${r.rm?' · remito '+esc(r.rm):''}${r.f?' · retiró '+(r.rb?esc(r.rb)+' el ':'')+fd(r.f):''}</div>`:'—'}</td>
     <td>${accionR(r,mes)}</td></tr>`).join('')
     :'<tr><td colspan="7" class="small" style="text-align:center;padding:20px">Sin roturas para mostrar.</td></tr>';
@@ -1037,11 +1037,12 @@ const esVale=m=>norm(m).startsWith('VALE');
 const motOpts=sel=>CONFIG.MOTIVOS.map(m=>`<option ${m===sel?'selected':''}>${esc(m)}</option>`).join('');
 function rotRow(mo){
   return `<div class="rrow"><div class="rh"><b class="rnum">RENGLÓN</b><button type="button" onclick="rotDel(this)">✕ Quitar</button></div>
-  <div class="rg"><div><label>Producto *</label><select class="rp">${prodOpts(false)}</select></div>
+  <div class="rg"><div><label>Producto *</label><select class="rp" onchange="rotCod(this)">${prodOpts(false)}</select><div class="small rcod" style="margin-top:4px">Código: <b>${esc(CONFIG.PRODUCTOS[0].c||'—')}</b></div></div>
   <div><label>Lote *</label><input class="rl" autocomplete="off" inputmode="numeric"></div>
   <div><label>Cant. *</label><input class="rc" type="number" min="1" max="20" value="1"></div></div>
   <div class="rg2"><div><label>Motivo</label><select class="rmo" onchange="rotMot(this)">${motOpts(mo)}</select></div>
   <div><label class="rol">${esVale(mo)?'N° de vale *':'Observaciones'}</label><input class="rob" autocomplete="off" placeholder="${esVale(mo)?'N° del vale de devolución':'Opcional'}"></div></div></div>`}
+function rotCod(sel){const p=CONFIG.PRODUCTOS.find(x=>x.k===sel.value);sel.closest('.rrow').querySelector('.rcod').innerHTML='Código: <b>'+esc(p&&p.c||'—')+'</b>'}
 function rotNum(box){box.querySelectorAll('.rnum').forEach((b,i)=>b.textContent='RENGLÓN '+(i+1))}
 function rotAdd(pf){const box=$(pf+'rows'),L=box.querySelectorAll('.rmo'),mo=L.length?L[L.length-1].value:'';
   box.insertAdjacentHTML('beforeend',rotRow(mo));rotNum(box);const n=box.querySelectorAll('.rp');n[n.length-1].focus()}
