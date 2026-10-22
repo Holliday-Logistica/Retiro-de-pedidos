@@ -31,8 +31,8 @@ header p{margin:6px 0 0;opacity:.8;font-size:.88rem}
 .card{background:var(--card);border:1px solid var(--br);border-radius:16px;padding:18px;box-shadow:0 8px 24px rgba(0,0,0,.07);margin-bottom:16px}
 .card h2{margin:0 0 12px;font-size:1.05rem}
 label{display:block;font-size:.8rem;font-weight:600;color:var(--mut);margin:12px 0 4px}
-input,select{width:100%;padding:11px 12px;border:1px solid var(--br);border-radius:10px;background:var(--in);color:var(--tx);font:inherit}
-input:focus,select:focus{outline:2px solid var(--ac)}
+input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--br);border-radius:10px;background:var(--in);color:var(--tx);font:inherit}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--ac)}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 button{cursor:pointer;border-radius:10px;padding:11px 16px;font:inherit;font-weight:700;background:var(--in);color:var(--tx);border:1px solid var(--br)}
 .pri{background:var(--ac);color:#ffffff;border-color:var(--ac)}
@@ -115,6 +115,17 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
 .uchip button{padding:0 4px;border:0;background:none;font-size:.8rem;color:var(--bad)}
 .lin select,.lin input{padding:9px 8px}
 
+.rrow{border:1px solid var(--br);border-radius:12px;padding:8px 10px 10px;margin-top:8px;background:var(--in)}
+.rrow input,.rrow select{background:var(--card)}
+.rrow label{margin-top:6px}
+.rh{display:flex;justify-content:space-between;align-items:center}
+.rh b{font-size:.72rem;color:var(--ac);letter-spacing:.04em}
+.rh button{padding:3px 9px;font-size:.75rem}
+.rg{display:grid;grid-template-columns:2fr 1fr 70px;gap:8px}
+.rg2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:560px){.rg{grid-template-columns:1fr 70px}.rg>div:first-child{grid-column:1/-1}.rg2{grid-template-columns:1fr}}
+.mlprev{background:#fff;color:#000;border:1px solid var(--br);border-radius:10px;padding:12px;overflow-x:auto}
+.mllist{max-height:260px;overflow:auto}
 .steps{margin:8px 0 0;padding-left:20px;text-align:left}.steps li{margin:7px 0}
 .ins{width:190mm;max-width:100%;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;padding:8mm;border:1px solid #000;text-align:left}
 .ins{-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -232,7 +243,7 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
         <div class="card">
           <h2>🐾 Registrar rotura en depósito</h2>
           <div id="rform"></div>
-          <p class="small">Cada bolsa queda como una unidad. Después la asignás a la primera persona anotada. Cuando la facturen, cargás el N° de remito y pasa a PEDIDOS para ubicarla en una celda y avisar. Si no hay nadie anotado, la mandás a <b>reparto (donación)</b> con su remito.</p>
+          <p class="small">Podés cargar varias juntas: un renglón por producto y lote. Cada bolsa queda como una unidad. Después la asignás a la primera persona anotada. Cuando la facturen, cargás el N° de remito y pasa a PEDIDOS para ubicarla en una celda y avisar. Si no hay nadie anotado, la mandás a <b>reparto (donación)</b> con su remito.</p>
         </div>
         <div class="card hide" id="rres"></div>
         <div class="card"><h2>➕ Anotar un pedido (a pedido de la persona)</h2><div id="stform"></div></div>
@@ -253,6 +264,7 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
       <div class="chips" id="rchips" style="margin-bottom:10px"></div>
       <div class="tw"><table><thead><tr><th>FECHA</th><th>PRODUCTO</th><th>LOTE</th><th>ESTADO</th><th>PERSONA</th><th>ACCIONES</th></tr></thead><tbody id="rlist"></tbody></table></div>
       <div class="acts" style="margin-top:14px">
+        <button class="pri" id="bmailR" onclick="mailRot()">✉ Armar mail de roturas</button>
         <button onclick="csvR()">⬇ Exportar CSV (formato planilla)</button>
         <button id="bcartelR" onclick="cartelR()">🖨 Cartel QR "Anotate a roturas"</button>
         <button id="bcartelD" onclick="cartelD()">🖨 QR para depósito (uso interno)</button>
@@ -264,6 +276,9 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
     </div>
   </div><!-- /tabR -->
 </div>
+
+<!-- Mail de roturas -->
+<div id="mlmodal" class="modal hide np"><div class="card" style="max-width:780px;width:100%;max-height:94vh;overflow:auto" id="mlbody"></div></div>
 
 <!-- Aviso al anotado -->
 <div id="avmodal" class="modal hide np"><div class="card" style="max-width:440px;width:100%" id="avbody"></div></div>
@@ -305,20 +320,20 @@ const CONFIG={
   WHATSAPP:'web',                    // 'web' = WhatsApp Web en el navegador (respeta bien los emojis) · 'app' = la aplicación de WhatsApp de la PC
   CORREO:'gmail',                    // desde dónde se manda el mail: 'outlook' (Outlook web de la empresa) · 'outlook-personal' (outlook.com / hotmail) · 'gmail' · 'predeterminado' (el programa de correo de la PC)
   FIRMA_MSG:'',
-  MOTIVOS:['Roturas en deposito','Roturas en pallets cerrado','Descarte (R)','Roturas bolsa despegada'],
+  MOTIVOS:['Roturas en deposito','Roturas en pallets cerrado','Descarte (R)','Roturas bolsa despegada','Vale devolución'],
   /* COMPLETAR los códigos que faltan */
   PRODUCTOS:[
     {k:'articular2',n:'MV ARTICULAR X 2 KG',c:''},
-    {k:'articular10',n:'MV ARTICULAR x 10 Kg',c:''},
+    {k:'articular10',n:'MV ARTICULAR x 10 Kg',c:'30-0001-1-AR'},
     {k:'cardiaco2',n:'MV CARDIACO x 2 Kg',c:''},
     {k:'cardiaco10',n:'MV CARDIACO x 10 Kg',c:''},
     {k:'gatosgastro2',n:'MV GATOS GASTROINTESTINAL X 2 KG',c:''},
     {k:'gatosobeso2',n:'MV GATOS OBESIDAD X 2 KG',c:''},
     {k:'gatosrenal2',n:'MV GATOS RENAL X 2 KG',c:''},
     {k:'gatosurinario2',n:'MV GATOS URINARIO x 2 Kg',c:''},
-    {k:'gatosurinario75',n:'MV GATOS URINARIO x 7.5 Kg',c:''},
+    {k:'gatosurinario75',n:'MV GATOS URINARIO x 7.5 Kg',c:'30-0005-1-AR'},
     {k:'perrosgastro2',n:'MV PERROS GASTROINTESTINAL x 2 Kg',c:''},
-    {k:'perrosgastro10',n:'MV PERROS GASTROINTESTINAL x 10 Kg',c:''},
+    {k:'perrosgastro10',n:'MV PERROS GASTROINTESTINAL x 10 Kg',c:'30-0003-1-AR'},
     {k:'perrosobeso2',n:'MV PERROS OBESIDAD x 2 Kg',c:''},
     {k:'perrosobeso10',n:'MV PERROS OBESIDAD x 10 Kg',c:''},
     {k:'renal2',n:'MV RENAL x 2 Kg',c:'30-0004-0-AR'},
@@ -327,6 +342,13 @@ const CONFIG={
     {k:'sensibilidad10',n:'MV SENSIBILIDAD DIETARIA x 10 Kg',c:''}
   ],
   /* Opcional: envío AUTOMÁTICO de mails con EmailJS (emailjs.com). Vacío = se abre el mail/WhatsApp con el texto ya escrito */
+  /* ---- MAIL DE ROTURAS (botón "Armar mail de roturas") ---- */
+  MAIL_ROTURAS:{
+    PARA:{n:'Carolina Tricarico',m:'ctricarico@holliday.com.ar',saludo:'Caro'},
+    EQUIPO:['cdeinnocentis@holliday.com.ar','jacevedo@holliday.com.ar','tzirkel@holliday.com.ar','egimenez@holliday.com.ar'],  // van en copia, menos quien lo envía
+    ASUNTO:'Roturas de alimento',
+    SISTEMA:'DEDON'
+  },
   EMAILJS:{service:'',template:'',key:''}
 };
 /* ========================= */
@@ -777,12 +799,12 @@ const mesKey=t=>{const d=new Date(t||Date.now());return d.getFullYear()+'-'+pad(
 const hoyISO=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
 const waLink=(num,msg)=>(CONFIG.WHATSAPP==='app'?`https://wa.me/${num}?text=`:`https://web.whatsapp.com/send?${num?'phone='+num+'&':''}text=`)+encodeURIComponent(msg);
 async function copiarMsg(txt,btn){try{await navigator.clipboard.writeText(txt);btn.textContent='✔ Mensaje copiado'}catch(e){const t=document.createElement('textarea');t.value=txt;document.body.appendChild(t);t.select();try{document.execCommand('copy');btn.textContent='✔ Mensaje copiado'}catch(x){btn.textContent='No se pudo copiar'}t.remove()}}
-const mailLink=(to,subj,body)=>{
-  const q=`subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`,t=encodeURIComponent(to),m=CONFIG.CORREO||'outlook';
-  return m==='gmail'?`https://mail.google.com/mail/?view=cm&fs=1&to=${t}&su=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`
-    :m==='outlook-personal'?`https://outlook.live.com/mail/0/deeplink/compose?to=${t}&${q}`
-    :m==='predeterminado'?`mailto:${to}?${q}`
-    :`https://outlook.office.com/mail/deeplink/compose?to=${t}&${q}`};
+const mailLink=(to,subj,body,cc,de)=>{
+  const E=encodeURIComponent,q=`subject=${E(subj)}&body=${E(body)}`,t=E(to),m=CONFIG.CORREO||'outlook',c=cc?`&cc=${E(cc)}`:'';
+  return m==='gmail'?`https://mail.google.com/mail/?${de?'authuser='+E(de)+'&':''}view=cm&fs=1&to=${t}${c}&su=${E(subj)}&body=${E(body)}`
+    :m==='outlook-personal'?`https://outlook.live.com/mail/0/deeplink/compose?to=${t}${c}&${q}`
+    :m==='predeterminado'?`mailto:${to}?${cc?'cc='+E(cc)+'&':''}${q}`
+    :`https://outlook.office.com/mail/deeplink/compose?to=${t}${c}&${q}`};
 const mailAttr=()=>(CONFIG.CORREO==='predeterminado'?'':' target="_blank" rel="noopener"');
 const dig=s=>String(s||'').replace(/\D/g,'');
 const pkOf=wa=>{const d=dig(wa);return d.length>=10?'u'+d.slice(-10):''};
@@ -833,6 +855,7 @@ function renderR(){
   if($('r1'))$('r1').textContent=rs.filter(r=>r.e==='DISPONIBLE').length;
   if($('r2'))$('r2').textContent=as.filter(a=>a.e==='ESPERA').length;
   if($('r3'))$('r3').textContent=rs.filter(r=>r.e==='ASIGNADA'||r.e==='FACTURADA').length;
+  if($('bmailR')){const n=sinInformar();$('bmailR').textContent='✉ Armar mail de roturas'+(n?' ('+n+' sin informar)':'')}
   if($('r4'))$('r4').textContent=rs.filter(r=>r.e==='RETIRADA'&&r.f&&mesKey(r.f)===mes).length;
 
   const porP={};as.forEach(x=>{(porP[x.pk]=porP[x.pk]||[]).push(x)});
@@ -853,7 +876,7 @@ function renderR(){
   if($('rchips'))$('rchips').innerHTML=[['DISPONIBLE','SIN ASIGNAR','#e2211c'],['ASIGNADA','PENDIENTE DE REMITO','#2563eb'],['FACTURADA','EN PEDIDOS','#7c3aed'],['RETIRADA','RETIRADAS','#6b7280'],['DONACION','A REPARTO','#0d9488'],['','TODAS','#182b3e']]
     .map(([e,t,c])=>`<button class="chip ${fRot===e?'on':''}" style="--c:${c}" onclick="setFR('${e}')">${t} (${cnt(e)})</button>`).join('');
   const l=rs.filter(r=>!fRot||r.e===fRot).sort((a,b)=>fRot==='DISPONIBLE'?a.t-b.t:(b.ta||b.t)-(a.ta||a.t)).slice(0,200);
-  if($('rlist'))$('rlist').innerHTML=l.length?l.map(r=>`<tr><td>${fd(r.t)}</td><td>${esc(r.d)}<div class="small">${r.cod?esc(r.cod)+' · ':''}${esc(r.mo)} · ctl ${esc(r.ct)}</div></td><td>${esc(r.lo)}</td><td>${estR(r)}</td>
+  if($('rlist'))$('rlist').innerHTML=l.length?l.map(r=>`<tr><td>${fd(r.t)}</td><td>${esc(r.d)}<div class="small">${r.cod?esc(r.cod)+' · ':''}${esc(r.mo)}${r.ob?' · <b>'+esc(r.ob)+'</b>':''} · ctl ${esc(r.ct)}</div></td><td>${esc(r.lo)}</td><td>${estR(r)}${r.ml?'<div class="small">✉ informada '+fd(r.ml)+'</div>':''}</td>
     <td>${r.e==='DONACION'?`<b>Reparto (donación)</b><div class="small">${r.rm?'remito '+esc(r.rm):'sin remito'}</div>`:r.nm?`<b>${esc(r.nm)}</b><div class="small">${usadas(r.pk,r.m)}/${LIM} en ${esc(r.m)}${r.rm?' · remito '+esc(r.rm):''}${r.f?' · retiró '+(r.rb?esc(r.rb)+' el ':'')+fd(r.f):''}</div>`:'—'}</td>
     <td>${accionR(r,mes)}</td></tr>`).join('')
     :'<tr><td colspan="6" class="small" style="text-align:center;padding:20px">Sin roturas para mostrar.</td></tr>';
@@ -921,7 +944,7 @@ async function remitoDon(rid){
   catch(e){alert('No se pudo guardar.')}}
 async function quitarReparto(rid){
   const r=R[rid];if(!r||r.e!=='DONACION'||!confirm('¿Quitar esta bolsa de reparto? Vuelve a estar sin asignar.'))return;
-  try{const r2={...r,e:'DISPONIBLE'};delete r2.rm;delete r2.td;await dbSet('roturas/'+rid,r2);R[rid]=r2;renderR()}
+  try{const r2={...r,e:'DISPONIBLE'};delete r2.rm;delete r2.td;delete r2.ml;await dbSet('roturas/'+rid,r2);R[rid]=r2;renderR()}
   catch(e){alert('No se pudo guardar.')}}
 
 function accionR(r,mes){
@@ -943,33 +966,58 @@ function accionR(r,mes){
   if(r.e==='RETIRADA')return `<div class="cellact"><button onclick="anularRetiroR('${r.id}')">↩ Anular retiro</button></div>`;
   return '<span class="small">—</span>'}
 
+/* ---- carga de roturas: varios renglones en una misma carga ---- */
+const esVale=m=>norm(m).startsWith('VALE');
+const motOpts=sel=>CONFIG.MOTIVOS.map(m=>`<option ${m===sel?'selected':''}>${esc(m)}</option>`).join('');
+function rotRow(mo){
+  return `<div class="rrow"><div class="rh"><b class="rnum">RENGLÓN</b><button type="button" onclick="rotDel(this)">✕ Quitar</button></div>
+  <div class="rg"><div><label>Producto *</label><select class="rp">${prodOpts(false)}</select></div>
+  <div><label>Lote *</label><input class="rl" autocomplete="off" inputmode="numeric"></div>
+  <div><label>Cant. *</label><input class="rc" type="number" min="1" max="20" value="1"></div></div>
+  <div class="rg2"><div><label>Motivo</label><select class="rmo" onchange="rotMot(this)">${motOpts(mo)}</select></div>
+  <div><label class="rol">${esVale(mo)?'N° de vale *':'Observaciones'}</label><input class="rob" autocomplete="off" placeholder="${esVale(mo)?'N° del vale de devolución':'Opcional'}"></div></div></div>`}
+function rotNum(box){box.querySelectorAll('.rnum').forEach((b,i)=>b.textContent='RENGLÓN '+(i+1))}
+function rotAdd(pf){const box=$(pf+'rows'),L=box.querySelectorAll('.rmo'),mo=L.length?L[L.length-1].value:'';
+  box.insertAdjacentHTML('beforeend',rotRow(mo));rotNum(box);const n=box.querySelectorAll('.rp');n[n.length-1].focus()}
+function rotDel(btn){const box=btn.closest('[id$="rows"]');
+  if(box.querySelectorAll('.rrow').length>1)btn.closest('.rrow').remove();
+  else{const r=btn.closest('.rrow');r.querySelector('.rl').value='';r.querySelector('.rc').value=1;r.querySelector('.rob').value=''}
+  rotNum(box)}
+function rotMot(sel){const r=sel.closest('.rrow'),v=esVale(sel.value);
+  r.querySelector('.rol').textContent=v?'N° de vale *':'Observaciones';
+  const o=r.querySelector('.rob');o.placeholder=v?'N° del vale de devolución':'Opcional';if(v)o.focus()}
 function formRotura(pf){
   let ini='';try{ini=localStorage.getItem('ctl_ini')||''}catch(e){}
-  return `<label>Producto *</label><select id="${pf}p">${prodOpts(false)}</select>
-  <div class="row"><div><label>Lote *</label><input id="${pf}l" autocomplete="off" inputmode="numeric"></div>
-  <div><label>Cantidad *</label><input id="${pf}c" type="number" min="1" max="20" value="1"></div></div>
-  <div class="row"><div><label>Motivo</label><select id="${pf}mo">${CONFIG.MOTIVOS.map(m=>`<option>${esc(m)}</option>`).join('')}</select></div>
-  <div><label>Controló *</label><input id="${pf}k" autocomplete="off" maxlength="6" placeholder="Iniciales" value="${esc(ini)}" style="text-transform:uppercase"></div></div>
-  <label>Fecha</label><input id="${pf}f" type="date" value="${hoyISO()}">
+  return `<div id="${pf}rows">${rotRow()}</div>
+  <button type="button" style="margin-top:8px" onclick="rotAdd('${pf}')">➕ Agregar otro renglón</button>
+  <div class="row"><div><label>Controló *</label><input id="${pf}k" autocomplete="off" maxlength="6" placeholder="Iniciales" value="${esc(ini)}" style="text-transform:uppercase"></div>
+  <div><label>Fecha</label><input id="${pf}f" type="date" value="${hoyISO()}"></div></div>
   <div class="err" id="${pf}err"></div>
-  <button class="pri full" onclick="guardarRotura('${pf}',this)">Registrar rotura</button>`}
+  <button class="pri full" onclick="guardarRotura('${pf}',this)">Registrar roturas</button>`}
+setTimeout(()=>{document.querySelectorAll('[id$="rows"]').forEach(rotNum)},0);
 async function guardarRotura(pf,btn){
-  const g=id=>$(pf+id),prod=CONFIG.PRODUCTOS.find(p=>p.k===g('p').value),lo=g('l').value.trim(),n=parseInt(g('c').value)||0,ct=g('k').value.trim().toUpperCase(),f=g('f').value,don=false,rem='',err=g('err');
-  if(!prod||!lo||!ct||n<1||n>20||!f){err.textContent='Completá producto, lote, cantidad (1–20), controló y fecha.';return}
+  const box=$(pf+'rows'),ct=$(pf+'k').value.trim().toUpperCase(),f=$(pf+'f').value,err=$(pf+'err');
+  const rows=[...box.querySelectorAll('.rrow')].map(d=>({prod:CONFIG.PRODUCTOS.find(p=>p.k===d.querySelector('.rp').value),lo:d.querySelector('.rl').value.trim(),n:parseInt(d.querySelector('.rc').value)||0,mo:d.querySelector('.rmo').value,ob:d.querySelector('.rob').value.trim()}));
+  for(let i=0;i<rows.length;i++){const x=rows[i];
+    if(!x.prod||!x.lo||x.n<1||x.n>20){err.textContent=`Renglón ${i+1}: completá producto, lote y cantidad (1–20).`;return}
+    if(esVale(x.mo)&&!x.ob){err.textContent=`Renglón ${i+1}: falta el N° de vale.`;return}}
+  if(!ct||!f){err.textContent='Completá quién controló y la fecha.';return}
   err.textContent='';if(btn)btn.disabled=true;
   try{
-    const t=new Date(f+'T12:00:00').getTime(),gid=uid('l'),tc=Date.now(),nuevas=[];
+    const t=new Date(f+'T12:00:00').getTime(),gid=uid('l'),tc=Date.now(),hechos=[];
     try{localStorage.setItem('ctl_ini',ct)}catch(e){}
-    for(let i=0;i<n;i++){const id=uid('r'),r={id,g:gid,tc,k:prod.k,cod:prod.c,d:prod.n,mo:g('mo').value,lo,ct,t,e:don?'DONACION':'DISPONIBLE'};if(don){r.rm=rem;r.td=tc}await dbSet('roturas/'+id,r);R[id]=r;nuevas.push(r)}
-    g('l').value='';g('c').value=1;
-    const rr=$(pf==='x'?'rres':'dres');rr.classList.remove('hide');
-    const head=`<div class="okbox">✔ ${n} ${plural(n,'bolsa registrada','bolsas registradas')}</div><div><b>${esc(prod.n)}</b> · lote ${esc(lo)}</div>`;
-    if(don)rr.innerHTML=head+`<p class="small" style="margin:8px 0 0">Van a <b>reparto (donación)</b>${rem?' · remito '+esc(rem):' · todavía sin remito (se carga después desde Roturas)'}.</p>`;
-    else if(pf==='x'){const c=cola(nuevas[0]);
-      rr.innerHTML=head+`<p class="small" style="margin:8px 0 0">${c.length?`Hay ${c.length} ${plural(c.length,'persona anotada','personas anotadas')} con cupo. Primera en la fila: <b>${esc(c[0].nm)}</b>. Asignala desde la tabla de abajo.`:'Todavía no hay nadie anotado con cupo para este producto; la bolsa queda sin asignar (o la mandás a reparto).'}</p>`}
-    else rr.innerHTML=head+'<p class="small" style="margin:8px 0 0">Logística se encarga de asignarla.</p>';
-    if(pf==='x'){fRot=don?'DONACION':'DISPONIBLE';await refreshR()}else recientesD();
-  }catch(e){err.textContent='No se pudo guardar. Revisá la conexión.'}
+    for(const x of rows){let first=null;
+      for(let i=0;i<x.n;i++){const id=uid('r'),r={id,g:gid,tc,k:x.prod.k,cod:x.prod.c,d:x.prod.n,mo:x.mo,lo:x.lo,ct,t,e:'DISPONIBLE'};if(x.ob)r.ob=x.ob;
+        await dbSet('roturas/'+id,r);R[id]=r;if(!first)first=r}
+      hechos.push({...x,first})}
+    box.innerHTML=rotRow();rotNum(box);
+    const tot=hechos.reduce((a,x)=>a+x.n,0),rr=$(pf==='x'?'rres':'dres');rr.classList.remove('hide');
+    rr.innerHTML=`<div class="okbox">✔ ${tot} ${plural(tot,'bolsa registrada','bolsas registradas')}</div>`+hechos.map(x=>{
+      let q='';if(pf==='x'){const c=cola(x.first);q=c.length?` · primera en la fila: <b>${esc(c[0].nm)}</b>`:' · <span class="small">nadie anotado con cupo (queda sin asignar o va a reparto)</span>'}
+      return `<div style="margin-top:4px">${x.n} × <b>${esc(x.prod.n)}</b> · lote ${esc(x.lo)}${x.ob?' · '+esc(x.ob):''}${q}</div>`}).join('')+
+      (pf==='x'?'<p class="small" style="margin:8px 0 0">Asignalas o mandalas a reparto desde la tabla de abajo. Después armás el mail con el botón ✉.</p>':'<p class="small" style="margin:8px 0 0">Logística se encarga de asignarlas.</p>');
+    if(pf==='x'){fRot='DISPONIBLE';await refreshR()}else recientesD();
+  }catch(e){err.textContent='No se pudo guardar todo. Revisá la conexión y la tabla antes de volver a cargar.'}
   if(btn)btn.disabled=false}
 
 /* ---- página del personal de depósito (#deposito) ---- */
@@ -978,7 +1026,7 @@ function vistaDeposito(){
   if(!FB){pub.innerHTML=AVISO_LOCAL;return}
   let ok=!CONFIG.PIN_DEPOSITO;try{ok=ok||sessionStorage.getItem('pind')==='1'}catch(e){}
   if(!ok){pub.innerHTML='<div class="card"><h2>Depósito · acceso</h2><input id="dpin" type="password" placeholder="PIN" inputmode="numeric"><button class="pri full" onclick="pinD()">Entrar</button><div class="err" id="dperr"></div></div>';return}
-  pub.innerHTML=`<div class="card"><h2>🐾 Cargar bolsa rota</h2><p class="small" style="margin:0">Cada bolsa rota es una unidad. Completá los datos y registrá; logística se encarga de asignarla.</p><div id="dform"></div></div>
+  pub.innerHTML=`<div class="card"><h2>🐾 Cargar bolsas rotas</h2><p class="small" style="margin:0">Podés cargar varias juntas: un renglón por producto y lote. Completá los datos y registrá; logística se encarga de asignarla.</p><div id="dform"></div></div>
   <div class="card hide" id="dres"></div>
   <div class="card"><h2>Últimas cargadas</h2><div id="drec"></div></div>`;
   $('dform').innerHTML=formRotura('d');recientesD()}
@@ -989,7 +1037,8 @@ async function recientesD(){
     const G={};Object.values((await dbGet('roturas'))||{}).filter(r=>r.tc&&r.g).forEach(r=>{(G[r.g]=G[r.g]||[]).push(r)});
     const L=Object.values(G).sort((a,b)=>b[0].tc-a[0].tc).slice(0,6);
     el.innerHTML=L.length?L.map(g=>{const r=g[0],libre=g.every(x=>x.e==='DISPONIBLE'||x.e==='DONACION');
-      return `<div class="sr" style="cursor:default"><div><b>${g.length} × ${esc(shortN(r.k))}</b><div class="small">lote ${esc(r.lo)} · ${fd(r.t)} · ${esc(r.ct)}${r.e==='DONACION'?' · 🚚 reparto':''}</div></div>${libre?`<button onclick="deshacerD('${esc(r.g)}')">✕ Deshacer</button>`:'<span class="small">en proceso</span>'}</div>`}).join(''):'<div class="small">Todavía no hay nada cargado.</div>'
+      const S={};g.forEach(x=>{const k=shortN(x.k)+' · lote '+x.lo;S[k]=(S[k]||0)+1});
+      return `<div class="sr" style="cursor:default"><div>${Object.entries(S).map(([k,q])=>`<div><b>${q} × ${esc(k)}</b></div>`).join('')}<div class="small">${fd(r.t)} · ${esc(r.ct)}</div></div>${libre?`<button onclick="deshacerD('${esc(r.g)}')">✕ Deshacer</button>`:'<span class="small">en proceso</span>'}</div>`}).join(''):'<div class="small">Todavía no hay nada cargado.</div>'
   }catch(e){el.innerHTML='<div class="small">Sin conexión.</div>'}}
 async function deshacerD(gid){
   if(!confirm('¿Deshacer esta carga? Se borran esas bolsas.'))return;
@@ -1045,7 +1094,7 @@ async function retirarR(rid){
 async function liberar(rid){
   const r=R[rid];if(!r||!confirm('¿Liberar la bolsa? Vuelve a estar sin asignar y '+r.nm+' vuelve a la lista de espera (conserva su lugar).'))return;
   try{
-    const base={id:r.id,k:r.k,cod:r.cod,d:r.d,mo:r.mo,lo:r.lo,ct:r.ct,t:r.t,e:'DISPONIBLE'};
+    const base={id:r.id,k:r.k,cod:r.cod,d:r.d,mo:r.mo,lo:r.lo,ct:r.ct,t:r.t,e:'DISPONIBLE'};if(r.ob)base.ob=r.ob;if(r.g){base.g=r.g;base.tc=r.tc}
     await dbSet('roturas/'+rid,base);R[rid]=base;
     const a=A[r.a];if(a){const a2={...a,e:'ESPERA'};delete a2.r;await dbSet(`anot/${a.pk}/${a.id}`,a2);A[a.id]=a2}
     await syncCupo(r.pk,r.m);renderR()
@@ -1053,10 +1102,84 @@ async function liberar(rid){
 async function borrarR(rid){if(!confirm('¿Eliminar esta bolsa registrada?'))return;try{await dbSet('roturas/'+rid,null);delete R[rid];renderR()}catch(e){alert('Error.')}}
 async function cancelarAnot(aid){const a=A[aid];if(!a||!confirm('¿Quitar a '+a.nm+' de la lista de espera?'))return;try{await dbSet(`anot/${a.pk}/${aid}`,null);delete A[aid];renderR()}catch(e){alert('Error.')}}
 
+/* ================= MAIL DE ROTURAS ================= */
+const MR=()=>CONFIG.MAIL_ROTURAS;
+const EST_ML=['ASIGNADA','FACTURADA','RETIRADA','DONACION'];
+let mlAll=false,mlSel={};
+const destMail=r=>r.e==='DONACION'?'DONACIÓN':'RETIRA DE LOGISTICA';
+const codOf=r=>r.cod||(CONFIG.PRODUCTOS.find(p=>p.k===r.k)||{}).c||'';
+const sinInformar=()=>Object.values(R).filter(r=>EST_ML.includes(r.e)&&!r.ml).length;
+const mailCands=()=>{const lim=Date.now()-30*864e5;
+  return Object.values(R).filter(r=>EST_ML.includes(r.e)&&(!r.ml||(mlAll&&r.ml>lim))).sort((a,b)=>(a.e==='DONACION')-(b.e==='DONACION')||a.d.localeCompare(b.d)||a.t-b.t)};
+const mlCC=()=>{const de=$('mlde').value;return MR().EQUIPO.filter(m=>m!==de&&m!==MR().PARA.m)};
+function mailRot(){
+  mlAll=false;mlSel={};mailCands().forEach(r=>mlSel[r.id]=true);
+  let de='';try{de=localStorage.getItem('mail_de')||''}catch(e){}
+  $('mlbody').innerHTML=`<h2>✉ Mail de roturas</h2>
+  <div class="row"><div><label>Para</label><input value="${esc(MR().PARA.n+' <'+MR().PARA.m+'>')}" disabled></div>
+  <div><label>¿Desde qué casilla lo mandás?</label><select id="mlde" onchange="mlDe()"><option value="">Otra (todo el equipo en copia)</option>${MR().EQUIPO.map(m=>`<option ${m===de?'selected':''}>${esc(m)}</option>`).join('')}</select></div></div>
+  <div class="small" id="mlcc" style="margin-top:6px"></div>
+  <label>Roturas a incluir</label>
+  <div class="chips" style="margin-bottom:6px"><button class="chip" id="mlall" style="--c:#6b7280" onclick="mlToggleAll()">MOSTRAR TAMBIÉN LAS YA INFORMADAS</button></div>
+  <div id="mllist" class="mllist"></div>
+  <label>Texto del mail <span style="font-weight:400">(se arma solo; podés corregirlo)</span></label><textarea id="mltx" rows="7" oninput="mlPrev()"></textarea>
+  <label>Vista previa</label><div id="mlprev" class="mlprev"></div>
+  <div class="err" id="mlerr"></div>
+  <button class="pri full" onclick="mlEnviar()">📋 Copiar y abrir el mail</button>
+  <p class="small">Se abre el mail con destinatario, copias y asunto. Hacé clic en el cuerpo del mensaje y pegá con <b>Ctrl+V</b>: queda el texto con la tablita.</p>
+  <button class="full" onclick="$('mlmodal').classList.add('hide')">Cerrar</button>`;
+  mlDe();mlList();$('mlmodal').classList.remove('hide')}
+function mlDe(){try{localStorage.setItem('mail_de',$('mlde').value)}catch(e){}$('mlcc').innerHTML='<b>CC:</b> '+esc(mlCC().join(', ')||'—')}
+function mlToggleAll(){mlAll=!mlAll;$('mlall').classList.toggle('on',mlAll);
+  const ids=new Set(mailCands().map(r=>r.id));Object.keys(mlSel).forEach(k=>{if(!ids.has(k))delete mlSel[k]});mlList()}
+function mlList(){
+  const L=mailCands();
+  $('mllist').innerHTML=L.length?L.map(r=>`<label class="pk" style="padding:8px"><input type="checkbox" ${mlSel[r.id]?'checked':''} onchange="mlSel['${r.id}']=this.checked;mlTexto()"><div><b>${esc(r.d)}</b> · lote ${esc(r.lo)}<div class="small">${esc(r.mo)}${r.ob?' · '+esc(r.ob):''} · ${r.e==='DONACION'?'<b>DONACIÓN</b>':'<b>RETIRA DE LOGÍSTICA</b>'+(r.nm?' ('+esc(r.nm)+')':'')}${r.ml?' · ya informada el '+fd(r.ml):''}</div></div></label>`).join('')
+    :'<div class="small">No hay roturas asignadas ni en reparto pendientes de informar.</div>';
+  mlTexto()}
+function mlFilas(){const G={};
+  Object.values(R).filter(r=>mlSel[r.id]&&EST_ML.includes(r.e)).forEach(r=>{const ds=destMail(r),cod=codOf(r),k=[ds,cod,r.d,r.mo,r.lo,r.ob||''].join('|');
+    (G[k]=G[k]||{ds,cod,d:r.d,mo:r.mo,lo:r.lo,ob:r.ob||'',k:r.k,q:0}).q++});
+  return Object.values(G).sort((a,b)=>(a.ds==='DONACIÓN')-(b.ds==='DONACIÓN')||a.d.localeCompare(b.d))}
+const resum=F=>{const S={};F.forEach(f=>{S[f.k]=(S[f.k]||0)+f.q});
+  const a=Object.entries(S).map(([k,q])=>q+' '+shortN(k).toLowerCase());return a.length>1?a.slice(0,-1).join(', ')+' y '+a[a.length-1]:(a[0]||'')};
+function mlTexto(){
+  const F=mlFilas(),ret=F.filter(f=>f.ds!=='DONACIÓN'),don=F.filter(f=>f.ds==='DONACIÓN'),h=new Date().getHours();
+  let t=(h<13?'Buen día':'Buenas tardes')+', '+MR().PARA.saludo+'.\n\n';
+  if(F.length){t+=`Pasamos las siguientes roturas al ${MR().SISTEMA}.`;
+    if(ret.length)t+=` Te pido por favor para logística ${resum(ret)}.`;
+    if(don.length)t+=ret.length?` Lo de donación (${resum(don)}) adonde quieras.`:` Van todas a donación (${resum(don)}), adonde quieras.`;
+    t+=' Muchas gracias.'}
+  $('mltx').value=t+'\n\nSaludos.';mlPrev()}
+function mlHTML(){
+  const F=mlFilas(),ob=F.some(f=>f.ob),bs='padding:6px 12px;border:1px solid #ffffff;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;text-align:center;',
+    hd=['CODIGO','DESCRIPCION','MOTIVO','LOTE','CANTIDAD','DESTINO'].concat(ob?['OBSERVACIONES']:[]);
+  const tb=F.length?`<table cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:12px"><tr>${hd.map(x=>`<th style="${bs}background:#5b5675;color:#ffffff">${x}</th>`).join('')}</tr>`+
+    F.map(f=>{const c=f.ds==='DONACIÓN'?'#d3ebd8':'#dcd6ea';
+      return `<tr>${[f.cod,f.d,f.mo,f.lo,f.q,f.ds].concat(ob?[f.ob]:[]).map(v=>`<td style="${bs}background:${c};color:#000000">${esc(v)}</td>`).join('')}</tr>`}).join('')+'</table>':'';
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#000000">${esc($('mltx').value).replace(/\n/g,'<br>')}${tb}</div>`}
+function mlTXT(){return $('mltx').value+'\n\n'+mlFilas().map(f=>[f.cod,f.d,f.mo+(f.ob?' ('+f.ob+')':''),'lote '+f.lo,'cant. '+f.q,f.ds].join(' | ')).join('\n')}
+function mlPrev(){$('mlprev').innerHTML=mlHTML()}
+async function copyRich(html,txt){
+  try{if(window.ClipboardItem&&navigator.clipboard&&navigator.clipboard.write){
+    await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([txt],{type:'text/plain'})})]);return true}}catch(e){}
+  try{const d=document.createElement('div');d.contentEditable='true';d.style.cssText='position:fixed;left:-9999px;top:0';d.innerHTML=html;document.body.appendChild(d);
+    const s=getSelection(),rg=document.createRange();rg.selectNodeContents(d);s.removeAllRanges();s.addRange(rg);const ok=document.execCommand('copy');s.removeAllRanges();d.remove();return ok}catch(e){return false}}
+async function mlEnviar(){
+  const F=mlFilas(),err=$('mlerr');if(!F.length){err.textContent='Tildá al menos una rotura.';return}
+  err.textContent='';
+  const ok=await copyRich(mlHTML(),mlTXT()),de=$('mlde').value,subj=MR().ASUNTO+' · '+fd(Date.now());
+  const u=mailLink(MR().PARA.m,subj,ok?'':mlTXT(),mlCC().join(','),de);
+  if(CONFIG.CORREO==='predeterminado')location.href=u;else window.open(u,'_blank');
+  const now=Date.now();
+  for(const id of Object.keys(mlSel).filter(k=>mlSel[k])){const r=R[id];if(!r)continue;const r2={...r,ml:now};R[id]=r2;try{await dbSet('roturas/'+id,r2)}catch(e){}}
+  renderR();
+  err.innerHTML=ok?'<span class="okbox">✔ Copiado. Pegá con Ctrl+V en el cuerpo del mail y enviá.</span>':'No se pudo copiar con formato: el mail se abrió con el texto plano.'}
+
 function csvR(){
   const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
-  const rows=Object.values(R).sort((a,b)=>a.t-b.t).map(r=>[r.cod,r.d,r.mo,r.lo,1,r.ct,fd(r.t),r.e==='RETIRADA'?'OK':'',r.rm||'',r.nm||(r.e==='DONACION'?'REPARTO (DONACIÓN)':''),r.m||''].map(q).join(','));
-  const out=['CODIGO,DESCRIPCION,MOTIVO,LOTE,CANTIDAD,CONTROLO,FECHA,OK,REMITO PARA,PERSONA,MES'].concat(rows).join('\n');
+  const rows=Object.values(R).sort((a,b)=>a.t-b.t).map(r=>[r.cod,r.d,r.mo,r.lo,1,r.ct,fd(r.t),r.e==='RETIRADA'?'OK':'',r.rm||'',r.nm||(r.e==='DONACION'?'REPARTO (DONACIÓN)':''),r.m||'',r.ob||''].map(q).join(','));
+  const out=['CODIGO,DESCRIPCION,MOTIVO,LOTE,CANTIDAD,CONTROLO,FECHA,OK,REMITO PARA,PERSONA,MES,OBSERVACIONES'].concat(rows).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+out],{type:'text/csv'}));a.download='roturas-'+hoyISO()+'.csv';a.click()}
 function cartelR(){
   if(!FB){alert('El cartel necesita la base de datos compartida (FIREBASE_URL).');return}
