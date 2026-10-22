@@ -541,6 +541,7 @@ function render(){
   const sel=selKey&&P[selKey]&&P[selKey].e==='LISTO'?cellsOf(P[selKey]):selCell;
   if($('plano')) $('plano').innerHTML=planoHTML(occ,sel,false);
   chips();celdaSel();lista();ubicarCard();detalle();
+  if($('tbP')){const nu=Object.values(P).filter(p=>p.e==='POR_UBICAR').length;$('tbP').textContent='📦 PEDIDOS'+(nu?' · '+nu+' por ubicar':'')}
   if($('seedb')) $('seedb').classList.toggle('hide',Object.keys(P).length>0)}
 function chips(){
   if($('dchips')) $('dchips').innerHTML=CONFIG.DESTINOS.map(d=>`<button type="button" class="chip ${destSel===d.k?'on':''}" style="--c:${d.c}" onclick="setDest('${d.k}')">${d.k}</button>`).join('');
@@ -579,7 +580,15 @@ function ubicarCard(){
   L.map(([k,p])=>{
     return `<div class="sr" style="cursor:default;flex-direction:column;align-items:stretch"><div><b>${esc(p.cl)}</b> <span class="small">Remito ${esc(p.n)}</span><div class="small">${esc(p.pr||p.o||'')}</div></div>
     <label style="margin-top:6px">Celdas y bultos</label>${cfHTML('ul_'+k)}
-    <div class="acts" style="margin-top:8px"><button class="pri" onclick="ubicar('${k}','ul_${k}')">📍 Ubicar y avisar</button><button onclick="pickPedido('${k}')">Ver</button></div></div>`}).join('')}
+    <div class="acts" style="margin-top:8px"><button class="pri" onclick="ubicar('${k}','ul_${k}')">📍 Ubicar y avisar</button><button onclick="retirarSinUbicar('${k}')">✔ Ya lo retiró</button><button onclick="pickPedido('${k}')">Ver</button></div></div>`}).join('')}
+async function retirarSinUbicar(k){
+  const p=P[k];if(!p||p.e!=='POR_UBICAR')return;
+  const rb=prompt(`Marcar RETIRADO sin ubicar\nPedido N° ${p.n} · ${p.cl}${p.pr?'\n'+p.pr:''}\n\n¿Quién lo retiró?`,prim(p.cl)?p.cl:'');
+  if(rb===null)return;
+  try{const now=Date.now(),p2={...p,e:'RETIRADO',f:now,rb:rb.trim()||p.cl,sd:1};
+    await dbSet('pedidos/'+k,p2);P[k]=p2;if(p.ro)await roturaRetirada(p.ro,now,p2.rb);
+    if(selKey===k)selKey=k;await refresh();refreshR()}
+  catch(e){alert('No se pudo registrar el retiro.')}}
 async function ubicar(k,selId){
   const p=P[k];if(!p)return;const r=cfGet(selId||'ul_'+k);if(r.err){alert(r.err);return}
   const cs=r.cs,c=r.c,bt=r.bt;
@@ -650,7 +659,7 @@ function detalle(){
   </div>`;
   else if(p.e==='POR_UBICAR')acc=`<div class="small" style="margin:8px 0">Pedido facturado desde Roturas. Falta darle una celda del mueble.</div>
   <label>Celdas y bultos</label>${cfHTML('ud')}
-  <div class="acts"><button class="pri" onclick="ubicar('${selKey}','ud')">📍 Ubicar y avisar</button><button onclick="eliminarPedido('${selKey}')">🗑 Eliminar</button></div>`;
+  <div class="acts"><button class="pri" onclick="ubicar('${selKey}','ud')">📍 Ubicar y avisar</button><button onclick="retirarSinUbicar('${selKey}')">✔ Marcar RETIRADO (se lo llevó sin ubicar)</button><button onclick="eliminarPedido('${selKey}')">🗑 Eliminar</button></div>`;
   else acc=`${p.fi?'<div><div class="small">Firma</div><img id="fimg" alt="firma" style="width:100%;max-width:260px;background:#fff;border:1px solid var(--br);border-radius:8px"></div>':''}
   <div class="acts"><button onclick="reabrir()">↩ Anular retiro</button><button onclick="eliminarPedido('${selKey}')">🗑 Eliminar pedido</button></div>`;
   d.innerHTML=`<h2>Pedido N° ${esc(p.n)} ${estTag(p)}</h2>
@@ -879,7 +888,7 @@ function renderR(){
   if($('rchips'))$('rchips').innerHTML=[['DISPONIBLE','SIN ASIGNAR','#e2211c'],['ASIGNADA','PENDIENTE DE REMITO','#2563eb'],['FACTURADA','EN PEDIDOS','#7c3aed'],['RETIRADA','RETIRADAS','#6b7280'],['DONACION','A REPARTO','#0d9488'],['','TODAS','#182b3e']]
     .map(([e,t,c])=>`<button class="chip ${fRot===e?'on':''}" style="--c:${c}" onclick="setFR('${e}')">${t} (${cnt(e)})</button>`).join('');
   const l=rs.filter(r=>!fRot||r.e===fRot).sort((a,b)=>fRot==='DISPONIBLE'?a.t-b.t:(b.ta||b.t)-(a.ta||a.t)).slice(0,200);
-  if($('rlist'))$('rlist').innerHTML=l.length?l.map(r=>`<tr class="${rSel[r.id]?'rs':''}"><td>${okSel(r)?`<input type="checkbox" class="rchk" ${rSel[r.id]?'checked':''} onchange="rTog('${r.id}',this.checked)">`:''}</td><td>${fd(r.t)}</td><td>${esc(r.d)}<div class="small">${r.cod?esc(r.cod)+' · ':''}${esc(r.mo)}${r.ob?' · <b>'+esc(r.ob)+'</b>':''} · ctl ${esc(r.ct)}</div></td><td>${esc(r.lo)}</td><td>${estR(r)}${r.ml?'<div class="small">✉ informada '+fd(r.ml)+'</div>':''}</td>
+  if($('rlist'))$('rlist').innerHTML=l.length?l.map(r=>`<tr class="${rSel[r.id]?'rs':''}"><td>${okSel(r)?`<input type="checkbox" class="rchk" ${rSel[r.id]?'checked':''} onchange="rTog('${r.id}',this.checked)">`:''}</td><td>${fd(r.t)}</td><td>${esc(r.d)}<div class="small">${r.cod?esc(r.cod)+' · ':''}${esc(r.mo)}${r.ob?' · <b>'+esc(r.ob)+'</b>':''} · ctl ${esc(r.ct)}</div></td><td>${esc(r.lo)}</td><td>${estR(r)}${r.ml?'<div class="small">✉ informada '+fd(r.ml)+(r.dm?' · '+(r.dm==='R'?'retira':'donación'):'')+'</div>':''}</td>
     <td>${r.e==='DONACION'?`<b>Reparto (donación)</b><div class="small">${r.rm?'remito '+esc(r.rm):'sin remito'}</div>`:r.nm?`<b>${esc(r.nm)}</b><div class="small">${usadas(r.pk,r.m)}/${LIM} en ${esc(r.m)}${r.rm?' · remito '+esc(r.rm):''}${r.f?' · retiró '+(r.rb?esc(r.rb)+' el ':'')+fd(r.f):''}</div>`:'—'}</td>
     <td>${accionR(r,mes)}</td></tr>`).join('')
     :'<tr><td colspan="7" class="small" style="text-align:center;padding:20px">Sin roturas para mostrar.</td></tr>';
@@ -935,8 +944,8 @@ async function facturarRotura(rid){
     const pedido={n,cl:r.nm.toUpperCase(),co:r.cod||'ROTURA',d:'RETIRA',c:'',e:'POR_UBICAR',t:Date.now(),o:'Rotura · lote '+r.lo,pr:r.d,wa:r.wa||'',em:r.em||'',ro:rid};
     const r2={...r,e:'FACTURADA',rm:n,pd:pk,tf:Date.now()};
     await dbSet('pedidos/'+pk,pedido);await dbSet('roturas/'+rid,r2);R[rid]=r2;
-    await refresh();await refreshR();setTab('P');
-    const u=$('ubicar');if(u&&!u.classList.contains('hide'))u.scrollIntoView({behavior:'smooth',block:'start'})
+    await refresh();await refreshR();
+    const rr=$('rres');if(rr){rr.classList.remove('hide');rr.innerHTML=`<div class="okbox">✔ Remito ${esc(n)} cargado · ${esc(r.nm)}</div><div class="small">${esc(r.d)} · lote ${esc(r.lo)}<br>Ya está en <b>PEDIDOS → Por ubicar</b>. Cuando quieras, ubicalo en una celda y avisá (o marcalo retirado si ya se lo llevó).</div><div class="acts"><button onclick="setTab('P');const u=$('ubicar');if(u&&!u.classList.contains('hide'))u.scrollIntoView({behavior:'smooth',block:'start'})">📦 Ir a ubicar</button></div>`}
   }catch(e){alert('Error al procesar el remito. Revisá la conexión.')}}
 function irPedido(k){setTab('P');if(P[k])pickPedido(k)}
 async function anularRemito(rid){
@@ -976,7 +985,7 @@ async function remitoDon(rid){
   catch(e){alert('No se pudo guardar.')}}
 async function quitarReparto(rid){
   const r=R[rid];if(!r||r.e!=='DONACION'||!confirm('¿Quitar esta bolsa de reparto? Vuelve a estar sin asignar.'))return;
-  try{const r2={...r,e:'DISPONIBLE'};delete r2.rm;delete r2.td;delete r2.ml;await dbSet('roturas/'+rid,r2);R[rid]=r2;renderR()}
+  try{const r2={...r,e:'DISPONIBLE'};delete r2.rm;delete r2.td;await dbSet('roturas/'+rid,r2);R[rid]=r2;renderR()}
   catch(e){alert('No se pudo guardar.')}}
 
 function accionR(r,mes){
@@ -1126,7 +1135,7 @@ async function retirarR(rid){
 async function liberar(rid){
   const r=R[rid];if(!r||!confirm('¿Liberar la bolsa? Vuelve a estar sin asignar y '+r.nm+' vuelve a la lista de espera (conserva su lugar).'))return;
   try{
-    const base={id:r.id,k:r.k,cod:r.cod,d:r.d,mo:r.mo,lo:r.lo,ct:r.ct,t:r.t,e:'DISPONIBLE'};if(r.ob)base.ob=r.ob;if(r.g){base.g=r.g;base.tc=r.tc}
+    const base={id:r.id,k:r.k,cod:r.cod,d:r.d,mo:r.mo,lo:r.lo,ct:r.ct,t:r.t,e:'DISPONIBLE'};if(r.ob)base.ob=r.ob;if(r.ml){base.ml=r.ml;if(r.dm)base.dm=r.dm}if(r.g){base.g=r.g;base.tc=r.tc}
     await dbSet('roturas/'+rid,base);R[rid]=base;
     const a=A[r.a];if(a){const a2={...a,e:'ESPERA'};delete a2.r;await dbSet(`anot/${a.pk}/${a.id}`,a2);A[a.id]=a2}
     await syncCupo(r.pk,r.m);renderR()
@@ -1134,26 +1143,38 @@ async function liberar(rid){
 async function borrarR(rid){if(!confirm('¿Eliminar esta bolsa registrada?'))return;try{await dbSet('roturas/'+rid,null);delete R[rid];renderR()}catch(e){alert('Error.')}}
 async function cancelarAnot(aid){const a=A[aid];if(!a||!confirm('¿Quitar a '+a.nm+' de la lista de espera?'))return;try{await dbSet(`anot/${a.pk}/${aid}`,null);delete A[aid];renderR()}catch(e){alert('Error.')}}
 
-/* ================= MAIL DE ROTURAS ================= */
+/* ================= MAIL DE ROTURAS =================
+   Informa las roturas SIN ASIGNAR (las del día) para que las facturen según el destino:
+   RETIRA DE LOGISTICA (hay alguien anotado) o DONACIÓN (reparto). */
 const MR=()=>CONFIG.MAIL_ROTURAS;
-const EST_ML=['ASIGNADA','FACTURADA','RETIRADA','DONACION'];
-let mlAll=false,mlSel={};
-const destMail=r=>r.e==='DONACION'?'DONACIÓN':'RETIRA DE LOGISTICA';
+let mlAll=false,mlSel={},mlDest={};
+const DST={R:'RETIRA DE LOGISTICA',D:'DONACIÓN'};
+const destMail=r=>DST[mlDest[r.id]||'D'];
 const codOf=r=>r.cod||(CONFIG.PRODUCTOS.find(p=>p.k===r.k)||{}).c||'';
-const sinInformar=()=>Object.values(R).filter(r=>EST_ML.includes(r.e)&&!r.ml).length;
-const mailCands=()=>{const lim=Date.now()-30*864e5;
-  return Object.values(R).filter(r=>EST_ML.includes(r.e)&&(!r.ml||(mlAll&&r.ml>lim))).sort((a,b)=>(a.e==='DONACION')-(b.e==='DONACION')||a.d.localeCompare(b.d)||a.t-b.t)};
+const sinInformar=()=>Object.values(R).filter(r=>r.e==='DISPONIBLE'&&!r.ml).length;
+const mailCands=()=>Object.values(R).filter(r=>r.e==='DISPONIBLE'&&(!r.ml||mlAll)).sort((a,b)=>a.d.localeCompare(b.d)||a.lo.localeCompare(b.lo)||a.t-b.t);
 const mlCC=()=>{const de=$('mlde').value;return MR().EQUIPO.filter(m=>m!==de&&m!==MR().PARA.m)};
+/* destino sugerido: tantas bolsas de cada producto para "retira" como personas haya en espera con cupo; el resto a donación */
+function mlSugerir(){
+  const usados={};
+  mailCands().forEach(r=>{if(mlDest[r.id])return;
+    if(r.dm){mlDest[r.id]=r.dm;return}
+    const n=cola(r).length;usados[r.k]=usados[r.k]||0;
+    mlDest[r.id]=usados[r.k]<n?'R':'D';if(mlDest[r.id]==='R')usados[r.k]++})}
 function mailRot(){
-  mlAll=false;mlSel={};mailCands().forEach(r=>mlSel[r.id]=true);
+  mlAll=false;mlSel={};mlDest={};mailCands().forEach(r=>mlSel[r.id]=true);mlSugerir();
   let de='';try{de=localStorage.getItem('mail_de')||''}catch(e){}
-  $('mlbody').innerHTML=`<h2>✉ Mail de roturas</h2>
+  $('mlbody').innerHTML=`<h2>✉ Mail de roturas del día</h2>
   <div class="row"><div><label>Para</label><input value="${esc(MR().PARA.n+' <'+MR().PARA.m+'>')}" disabled></div>
   <div><label>¿Desde qué casilla lo mandás?</label><select id="mlde" onchange="mlDe()"><option value="">Otra (todo el equipo en copia)</option>${MR().EQUIPO.map(m=>`<option ${m===de?'selected':''}>${esc(m)}</option>`).join('')}</select></div></div>
   <div class="small" id="mlcc" style="margin-top:6px"></div>
-  <label>Roturas a incluir</label>
-  <div class="chips" style="margin-bottom:6px"><button class="chip" id="mlall" style="--c:#6b7280" onclick="mlToggleAll()">MOSTRAR TAMBIÉN LAS YA INFORMADAS</button></div>
+  <label>Roturas sin asignar a informar · elegí el destino de cada una</label>
+  <div class="chips" style="margin-bottom:6px">
+    <button class="chip" style="--c:#7c3aed" onclick="mlTodas('R')">TODAS RETIRA</button>
+    <button class="chip" style="--c:#0d9488" onclick="mlTodas('D')">TODAS DONACIÓN</button>
+    <button class="chip" id="mlall" style="--c:#6b7280" onclick="mlToggleAll()">MOSTRAR TAMBIÉN LAS YA INFORMADAS</button></div>
   <div id="mllist" class="mllist"></div>
+  <p class="small" style="margin:4px 0 0">El destino viene sugerido: <b>Retira</b> si hay alguien anotado con cupo para ese producto, si no <b>Donación</b>.</p>
   <label>Texto del mail <span style="font-weight:400">(se arma solo; podés corregirlo)</span></label><textarea id="mltx" rows="7" oninput="mlPrev()"></textarea>
   <label>Vista previa</label><div id="mlprev" class="mlprev"></div>
   <div class="err" id="mlerr"></div>
@@ -1163,14 +1184,19 @@ function mailRot(){
   mlDe();mlList();$('mlmodal').classList.remove('hide')}
 function mlDe(){try{localStorage.setItem('mail_de',$('mlde').value)}catch(e){}$('mlcc').innerHTML='<b>CC:</b> '+esc(mlCC().join(', ')||'—')}
 function mlToggleAll(){mlAll=!mlAll;$('mlall').classList.toggle('on',mlAll);
-  const ids=new Set(mailCands().map(r=>r.id));Object.keys(mlSel).forEach(k=>{if(!ids.has(k))delete mlSel[k]});mlList()}
+  const ids=new Set(mailCands().map(r=>r.id));Object.keys(mlSel).forEach(k=>{if(!ids.has(k))delete mlSel[k]});mlSugerir();mlList()}
+function mlTodas(d){mailCands().forEach(r=>{if(mlSel[r.id])mlDest[r.id]=d});mlList()}
+function mlSetD(id,d){mlDest[id]=d;mlTexto()}
 function mlList(){
   const L=mailCands();
-  $('mllist').innerHTML=L.length?L.map(r=>`<label class="pk" style="padding:8px"><input type="checkbox" ${mlSel[r.id]?'checked':''} onchange="mlSel['${r.id}']=this.checked;mlTexto()"><div><b>${esc(r.d)}</b> · lote ${esc(r.lo)}<div class="small">${esc(r.mo)}${r.ob?' · '+esc(r.ob):''} · ${r.e==='DONACION'?'<b>DONACIÓN</b>':'<b>RETIRA DE LOGÍSTICA</b>'+(r.nm?' ('+esc(r.nm)+')':'')}${r.ml?' · ya informada el '+fd(r.ml):''}</div></div></label>`).join('')
-    :'<div class="small">No hay roturas asignadas ni en reparto pendientes de informar.</div>';
+  $('mllist').innerHTML=L.length?L.map(r=>{const n=cola(r).length;
+    return `<div class="pk" style="padding:8px;cursor:default"><input type="checkbox" ${mlSel[r.id]?'checked':''} onchange="mlSel['${r.id}']=this.checked;mlTexto()">
+    <div style="flex:1;min-width:0"><b>${esc(r.d)}</b> · lote ${esc(r.lo)}<div class="small">${esc(r.mo)}${r.ob?' · '+esc(r.ob):''} · ${fd(r.t)}${n?` · <b>${n} ${plural(n,'anotado','anotados')}</b>`:' · nadie anotado'}${r.ml?' · ya informada el '+fd(r.ml):''}</div></div>
+    <select style="width:auto;flex:none;padding:7px 8px" onchange="mlSetD('${r.id}',this.value)"><option value="R" ${mlDest[r.id]==='R'?'selected':''}>Retira</option><option value="D" ${mlDest[r.id]!=='R'?'selected':''}>Donación</option></select></div>`}).join('')
+    :'<div class="small">No hay roturas sin asignar pendientes de informar.</div>';
   mlTexto()}
 function mlFilas(){const G={};
-  Object.values(R).filter(r=>mlSel[r.id]&&EST_ML.includes(r.e)).forEach(r=>{const ds=destMail(r),cod=codOf(r),k=[ds,cod,r.d,r.mo,r.lo,r.ob||''].join('|');
+  Object.values(R).filter(r=>mlSel[r.id]&&r.e==='DISPONIBLE').forEach(r=>{const ds=destMail(r),cod=codOf(r),k=[ds,cod,r.d,r.mo,r.lo,r.ob||''].join('|');
     (G[k]=G[k]||{ds,cod,d:r.d,mo:r.mo,lo:r.lo,ob:r.ob||'',k:r.k,q:0}).q++});
   return Object.values(G).sort((a,b)=>(a.ds==='DONACIÓN')-(b.ds==='DONACIÓN')||a.d.localeCompare(b.d))}
 const resum=F=>{const S={};F.forEach(f=>{S[f.k]=(S[f.k]||0)+f.q});
@@ -1204,7 +1230,7 @@ async function mlEnviar(){
   const u=mailLink(MR().PARA.m,subj,ok?'':mlTXT(),mlCC().join(','),de);
   if(CONFIG.CORREO==='predeterminado')location.href=u;else window.open(u,'_blank');
   const now=Date.now();
-  for(const id of Object.keys(mlSel).filter(k=>mlSel[k])){const r=R[id];if(!r)continue;const r2={...r,ml:now};R[id]=r2;try{await dbSet('roturas/'+id,r2)}catch(e){}}
+  for(const id of Object.keys(mlSel).filter(k=>mlSel[k])){const r=R[id];if(!r||r.e!=='DISPONIBLE')continue;const r2={...r,ml:now,dm:mlDest[id]||'D'};R[id]=r2;try{await dbSet('roturas/'+id,r2)}catch(e){}}
   renderR();
   err.innerHTML=ok?'<span class="okbox">✔ Copiado. Pegá con Ctrl+V en el cuerpo del mail y enviá.</span>':'No se pudo copiar con formato: el mail se abrió con el texto plano.'}
 
