@@ -124,6 +124,8 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
 .rg{display:grid;grid-template-columns:2fr 1fr 70px;gap:8px}
 .rg2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media(max-width:560px){.rg{grid-template-columns:1fr 70px}.rg>div:first-child{grid-column:1/-1}.rg2{grid-template-columns:1fr}}
+.rchk{width:20px;height:20px;accent-color:#0d9488;cursor:pointer}
+tr.rs td{background:rgba(13,148,136,.14)}
 .mlprev{background:#fff;color:#000;border:1px solid var(--br);border-radius:10px;padding:12px;overflow-x:auto}
 .mllist{max-height:260px;overflow:auto}
 .steps{margin:8px 0 0;padding-left:20px;text-align:left}.steps li{margin:7px 0}
@@ -262,7 +264,8 @@ tr.r{cursor:pointer}tr.r:hover{background:var(--in)}
     <div class="card">
       <h2>Roturas registradas</h2>
       <div class="chips" id="rchips" style="margin-bottom:10px"></div>
-      <div class="tw"><table><thead><tr><th>FECHA</th><th>PRODUCTO</th><th>LOTE</th><th>ESTADO</th><th>PERSONA</th><th>ACCIONES</th></tr></thead><tbody id="rlist"></tbody></table></div>
+      <div id="rbulk" class="hide" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px;border:2px solid #0d9488;border-radius:12px;margin-bottom:10px"></div>
+      <div class="tw"><table><thead><tr><th style="width:34px"><input type="checkbox" id="rall" class="rchk" title="Tildar todas las que se pueden mandar a reparto" onchange="rSelAll(this.checked)"></th><th>FECHA</th><th>PRODUCTO</th><th>LOTE</th><th>ESTADO</th><th>PERSONA</th><th>ACCIONES</th></tr></thead><tbody id="rlist"></tbody></table></div>
       <div class="acts" style="margin-top:14px">
         <button class="pri" id="bmailR" onclick="mailRot()">✉ Armar mail de roturas</button>
         <button onclick="csvR()">⬇ Exportar CSV (formato planilla)</button>
@@ -876,10 +879,11 @@ function renderR(){
   if($('rchips'))$('rchips').innerHTML=[['DISPONIBLE','SIN ASIGNAR','#e2211c'],['ASIGNADA','PENDIENTE DE REMITO','#2563eb'],['FACTURADA','EN PEDIDOS','#7c3aed'],['RETIRADA','RETIRADAS','#6b7280'],['DONACION','A REPARTO','#0d9488'],['','TODAS','#182b3e']]
     .map(([e,t,c])=>`<button class="chip ${fRot===e?'on':''}" style="--c:${c}" onclick="setFR('${e}')">${t} (${cnt(e)})</button>`).join('');
   const l=rs.filter(r=>!fRot||r.e===fRot).sort((a,b)=>fRot==='DISPONIBLE'?a.t-b.t:(b.ta||b.t)-(a.ta||a.t)).slice(0,200);
-  if($('rlist'))$('rlist').innerHTML=l.length?l.map(r=>`<tr><td>${fd(r.t)}</td><td>${esc(r.d)}<div class="small">${r.cod?esc(r.cod)+' · ':''}${esc(r.mo)}${r.ob?' · <b>'+esc(r.ob)+'</b>':''} · ctl ${esc(r.ct)}</div></td><td>${esc(r.lo)}</td><td>${estR(r)}${r.ml?'<div class="small">✉ informada '+fd(r.ml)+'</div>':''}</td>
+  if($('rlist'))$('rlist').innerHTML=l.length?l.map(r=>`<tr class="${rSel[r.id]?'rs':''}"><td>${okSel(r)?`<input type="checkbox" class="rchk" ${rSel[r.id]?'checked':''} onchange="rTog('${r.id}',this.checked)">`:''}</td><td>${fd(r.t)}</td><td>${esc(r.d)}<div class="small">${r.cod?esc(r.cod)+' · ':''}${esc(r.mo)}${r.ob?' · <b>'+esc(r.ob)+'</b>':''} · ctl ${esc(r.ct)}</div></td><td>${esc(r.lo)}</td><td>${estR(r)}${r.ml?'<div class="small">✉ informada '+fd(r.ml)+'</div>':''}</td>
     <td>${r.e==='DONACION'?`<b>Reparto (donación)</b><div class="small">${r.rm?'remito '+esc(r.rm):'sin remito'}</div>`:r.nm?`<b>${esc(r.nm)}</b><div class="small">${usadas(r.pk,r.m)}/${LIM} en ${esc(r.m)}${r.rm?' · remito '+esc(r.rm):''}${r.f?' · retiró '+(r.rb?esc(r.rb)+' el ':'')+fd(r.f):''}</div>`:'—'}</td>
     <td>${accionR(r,mes)}</td></tr>`).join('')
-    :'<tr><td colspan="6" class="small" style="text-align:center;padding:20px">Sin roturas para mostrar.</td></tr>';
+    :'<tr><td colspan="7" class="small" style="text-align:center;padding:20px">Sin roturas para mostrar.</td></tr>';
+  rBulk(l);
 
   const P2={};
   as.forEach(a=>{const p=P2[a.pk]=P2[a.pk]||{nm:a.nm,wa:a.wa,w:0};if(a.e==='ESPERA')p.w++});
@@ -889,6 +893,34 @@ function renderR(){
     return `<tr><td><b>${esc(p.nm)}</b></td><td>${esc(p.wa)}</td><td>${u} / ${LIM}</td><td><b>${rest(u)}</b></td><td>${p.w||'—'}</td></tr>`}).join('')
     :'<tr><td colspan="5" class="small" style="text-align:center;padding:20px">Todavía no hay personas anotadas.</td></tr>'}
 const setFR=e=>{fRot=e;renderR()};
+
+/* ---- selección múltiple: mandar varias a reparto con un mismo remito ---- */
+let rSel={};
+const okSel=r=>r&&(r.e==='DISPONIBLE'||r.e==='DONACION');
+function rTog(id,v){if(v)rSel[id]=true;else delete rSel[id];renderR()}
+function rSelAll(v){const vis=Object.values(R).filter(r=>(!fRot||r.e===fRot)&&okSel(r));vis.forEach(r=>{if(v)rSel[r.id]=true;else delete rSel[r.id]});renderR()}
+function rBulk(vis){
+  Object.keys(rSel).forEach(id=>{if(!okSel(R[id]))delete rSel[id]});
+  const ids=Object.keys(rSel),el=$('rbulk'),ra=$('rall'),el2=(vis||[]).filter(okSel);
+  if(ra){ra.checked=el2.length>0&&el2.every(r=>rSel[r.id]);ra.disabled=!el2.length}
+  if(!el)return;
+  if(!ids.length){el.classList.add('hide');el.innerHTML='';return}
+  const L=ids.map(id=>R[id]),nd=L.filter(r=>r.e==='DISPONIBLE').length,nr=L.length-nd;
+  el.classList.remove('hide');
+  el.innerHTML=`<b>${L.length} ${plural(L.length,'seleccionada','seleccionadas')}</b><span class="small">${nd?nd+' sin asignar':''}${nd&&nr?' · ':''}${nr?nr+' ya en reparto':''}</span>
+    <button class="pri" style="background:#0d9488;border-color:#0d9488" onclick="repartoVarias()">🚚 ${nd?'Mandar a reparto con un mismo remito':'Cargar el mismo remito'}</button>
+    <button onclick="rSel={};renderR()">Quitar selección</button>`}
+async function repartoVarias(){
+  const L=Object.keys(rSel).map(id=>R[id]).filter(okSel);if(!L.length)return;
+  const prev=[...new Set(L.map(r=>r.rm).filter(Boolean))];
+  const resumen=Object.entries(L.reduce((o,r)=>{const k=shortN(r.k)+' · lote '+r.lo;o[k]=(o[k]||0)+1;return o},{})).map(([k,q])=>q+' × '+k).join('\n');
+  const rem=prompt(`Van a REPARTO (donación) ${L.length} ${plural(L.length,'bolsa','bolsas')}:\n${resumen}\n\nN° de remito (el mismo para todas):`,prev.length===1?prev[0]:'');
+  if(rem===null)return;
+  if(!rem.trim()){alert('Ingresá el número de remito.');return}
+  let err=0;
+  for(const r of L){try{const r2={...r,e:'DONACION',rm:rem.trim(),td:r.td||Date.now()};await dbSet('roturas/'+r.id,r2);R[r.id]=r2;delete rSel[r.id]}catch(e){err++}}
+  renderR();
+  if(err)alert(`No se pudieron guardar ${err}. Revisá la conexión y probá de nuevo con las que quedaron tildadas.`)}
 
 /* ---- Cargar REMITO: la rotura pasa a PEDIDOS (por ubicar) ---- */
 async function facturarRotura(rid){
